@@ -372,6 +372,15 @@ var addingTheme=false, themeDel=null;
 /* Fallback status, "make fallback" and delete (with what it would change) for Owner and Admins. */
 function themeAdminBox(theme){
   if(!isAdmin())return '';
+  return themeRenameBox(theme)+themeFallbackBox(theme);
+}
+/* The theme's own name (what TVs, schedule rows and people refer to). "Name on screens" is separate. */
+function themeRenameBox(theme){
+  return '<div class="row" style="align-items:flex-end"><label class="f" style="flex:1;min-width:160px">Theme name<input type="text" id="thRename" value="'+esc(theme)+'"></label>'+
+    '<button class="btn sm" data-act="themeRename" data-t="'+esc(theme)+'">Rename</button></div>'+
+    '<p class="muted small" style="margin:0">Renaming also updates the TVs, schedule rows, override, presets and people that use this theme.</p>';
+}
+function themeFallbackBox(theme){
   if(theme===S.fallbackTheme)return '<div class="small"><span class="chip">Fallback theme</span> TVs use this theme when theirs is deleted or missing. To delete it, make another theme the fallback first.</div>';
   var h='<div class="row"><button class="btn sm" data-act="themeFallback" data-t="'+esc(theme)+'">Make this the fallback theme</button>';
   if(!themeDel||themeDel.theme!==theme)return h+'<button class="btn sm danger" data-act="themeDelAsk" data-t="'+esc(theme)+'">Delete theme…</button></div>';
@@ -882,6 +891,14 @@ var ACT={
       .withFailureHandler(function(e){themeDel=null;fail(e);}).themeUsage(t,TOKEN);
   },
   themeDelCancel:function(){themeDel=null;render();},
+  themeRename:function(b){
+    var from=b.dataset.t,to=val('thRename').trim();
+    if(!to||to===from){toast('Type a new name first.',true);return;}
+    call('renameTheme',[from,to],'',function(r){
+      themeDel=null;themeForm={Theme:r.name};if(slideTheme===from)slideTheme=r.name;
+      toast('Renamed to '+r.name+(r.updated?'. Updated '+r.updated+' rows that used it':'')+(r.folderRenamed?', and its slides folder':'')+'.');
+    });
+  },
   themeDelGo:function(b){
     var t=b.dataset.t;
     call('deleteTheme',[t],'',function(r){themeDel=null;themeForm=null;toast('Deleted '+t+(r&&r.devices?'. '+r.devices+' TV'+(r.devices===1?'':'s')+' now use '+r.fallback+'.':'.'));});

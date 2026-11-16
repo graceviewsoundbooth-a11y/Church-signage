@@ -1912,3 +1912,47 @@ function deleteTheme(theme, token) {
     return { fallback: fallback, devices: r.devices.length };
   });
 }
+
+/**
+ * Renames a theme and everything that refers to it by name: TVs, schedule rows, the override,
+ * presets, Limited users and the fallback setting. The theme's Drive folder is renamed too when
+ * it still has the name the app gave it ("<Theme> Slides").
+ */
+function renameTheme(oldName, newName, token) {
+  return locked_(function () {
+    const d = data_(); const me = me_(d, token);
+    needAdmin_(me);
+    const row = themeRow_(d, oldName);
+    newName = String(newName || '').trim();
+    if (!newName) throw new Error('Give the theme a name.');
+    if (/[,;]/.test(newName)) throw new Error('Theme names can\'t contain commas or semicolons.');
+    if (newName === oldName) return { name: newName, updated: 0 };
+    if (d.themes.some(function (x) { return x.Theme !== oldName && x.Theme.toLowerCase() === newName.toLowerCase(); })) {
+      throw new Error('There\'s already a theme called ' + newName + '.');
+    }
+    const r = themeRefs_(d, oldName);
+    let updated = 0;
+    const set = function (tab, rowNum, col, v) { sheet_(tab).getRange(rowNum, col).setValue(v); updated++; };
+    sheet_('Themes').getRange(row._row, 1).setValue(newName);
+    r.devices.forEach(function (v) { set('Devices', v._row, 6, newName); });
+    r.weekly.forEach(function (x) { set('Weekly', x._row, 7, newName); });
+    r.special.forEach(function (x) { set('Special Dates', x._row, 9, newName); });
+    r.override.forEach(function (x) { set('Override', x._row, 4, newName); });
+    r.presets.forEach(function (x) { set('Presets', x._row, 4, newName); });
+    r.users.forEach(function (u) {
+      set('Users', u._row, 4, split_(u.Themes, ',').map(function (x) { return x.trim() === oldName ? newName : x.trim(); }).join(', '));
+    });
+    if (String(settings_()['Fallback Theme'] || '').trim() === oldName) setSetting_('Fallback Theme', newName);
+    // The theme's slides folder, if it still has the name the app gave it.
+    let folderRenamed = false;
+    const id = folderId_(row['Slides Folder']);
+    if (id) {
+      try {
+        const f = DriveApp.getFolderById(id);
+        if (f.getName() === oldName + ' Slides') { f.setName(newName + ' Slides'); folderRenamed = true; }
+      } catch (err) { /* folder unreachable: leave it */ }
+    }
+    log_(me, 'Renamed theme', oldName + ' to ' + newName + ' (' + updated + ' rows updated' + (folderRenamed ? ', slides folder renamed' : '') + ')');
+    return { name: newName, updated: updated, folderRenamed: folderRenamed };
+  });
+}
