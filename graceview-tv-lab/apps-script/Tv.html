@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+<head>
+<base target="_top">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Source+Sans+3:wght@300;400;600;700&display=swap">
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden}
+#stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0}
+#stage .scr{transform:none!important}
+#tag{position:fixed;right:10px;bottom:8px;font:13px Arial,sans-serif;color:rgba(255,255,255,.45);background:rgba(0,0,0,.35);padding:3px 8px;border-radius:4px}
+/* Pairing and message screens, drawn at 1920x1080 like everything else */
+.pair{position:absolute;inset:0;background:#111418;color:#E8ECF1;font-family:'Source Sans 3','Segoe UI',Arial,sans-serif;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:40px;text-align:center}
+.pair h1{margin:0;font:700 64px Montserrat,'Segoe UI',Arial,sans-serif}
+.pair .church{font-size:40px;color:#9aa3ad}
+.pair .code{font:700 200px Montserrat,'Segoe UI',Arial,sans-serif;letter-spacing:.08em;background:#1B2027;border-radius:28px;padding:24px 64px;font-variant-numeric:tabular-nums}
+.pair ol{margin:0;padding:0;list-style:none;font-size:40px;line-height:1.5;color:#c9d1da}
+.pair .small{font-size:30px;color:#6d7783}
+.pair .ok{font:700 72px Montserrat,'Segoe UI',Arial,sans-serif;color:#4CC38A}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="tag"></div>
+<script id="params" type="application/json"><?!= params ?></script>
+<?!= include('Screen') ?>
+<script>
+/*
+ * Three ways this page runs:
+ *   "?screen"            a TV. With no device key it shows a pairing code; once paired it shows its TV.
+ *   "?tv=ID[&at=…]"      a preview for people signed in to the panel. It never counts as the TV checking in.
+ */
+var P=JSON.parse(document.getElementById('params').textContent||'{}');
+var PREVIEW=!!P.tv;
+var DEVICE_KEY='gvlab-device', PANEL_KEY='gvlab-token';
+var D=null,slideIndex=0,lastSlideAt=Date.now(),lastKey='',pairing=null,pollTimer=null,loadTimer=null;
+
+function store(k,v){try{if(v===undefined)return localStorage.getItem(k)||'';if(v)localStorage.setItem(k,v);else localStorage.removeItem(k);}catch(e){return '';}}
+function esc2(s){return esc(s);}
+function chicagoNow(){
+  var f=new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+  var p={};f.formatToParts(new Date()).forEach(function(x){p[x.type]=x.value;});
+  return {ymd:p.year+'-'+p.month+'-'+p.day,mins:(+p.hour)*60+(+p.minute),secs:+p.second};
+}
+function clock(){return D&&D.t.preview?{ymd:D.t.ymd,mins:D.t.mins,secs:0}:chicagoNow();}
+function fit(){
+  var s=Math.min(innerWidth/1920,innerHeight/1080);
+  document.getElementById('stage').style.transform='translate('+((innerWidth-1920*s)/2)+'px,'+((innerHeight-1080*s)/2)+'px) scale('+s+')';
+}
+function stage(html){document.getElementById('stage').innerHTML=html;}
+function tag(t){document.getElementById('tag').textContent=t||'';}
+function message(title,body){D=null;stage('<div class="pair"><h1>'+esc2(title)+'</h1><div class="small">'+esc2(body||'')+'</div></div>');}
+
+/* ---------- showing a TV ---------- */
+function draw(force){
+  if(!D)return;
+  var c=clock();
+  var key=D.screen.mode+'|'+slideIndex+'|'+c.mins+(D.screen.mode==='Countdown'?'|'+c.secs:'');
+  if(!force&&key===lastKey)return;
+  lastKey=key;
+  stage(renderScreen(D.screen,c,D.weather,{slideIndex:slideIndex}));
+}
+function show(r){
+  var changed=!D||JSON.stringify(D.screen)!==JSON.stringify(r.screen);
+  D=r;if(changed)slideIndex=0;
+  tag(r.screen.device.name+' · '+r.now.mode+' · '+r.now.label+(PREVIEW?' · preview'+(r.t.preview?' of '+r.t.stamp:''):''));
+  draw(true);
+}
+function load(){
+  var run=google.script.run.withFailureHandler(function(err){
+    // Keep showing the last good screen; try again on the next check.
+    tag('Can\'t reach the dashboard right now. Showing the last screen. ('+err.message+')');
+  });
+  if(PREVIEW){
+    run.withSuccessHandler(function(r){
+      if(r.signIn){message('Sign in to preview','Open the dashboard and sign in, then open this preview again.');return;}
+      if(r.error){message('Can\'t show this TV',r.error);return;}
+      show(r);
+    }).previewTv(P.tv,P.at||'',store(PANEL_KEY));
+    return;
+  }
+  var key=store(DEVICE_KEY);
+  if(!key){startPairing();return;}
+  run.withSuccessHandler(function(r){
+    if(r.unpaired){store(DEVICE_KEY,'');D=null;startPairing();return;}
+    show(r);
+  }).getTv(key);
+}
+
+/* ---------- pairing ---------- */
+function codeText(c){return c.slice(0,3)+'-'+c.slice(3);}
+function drawPairing(){
+  if(!pairing)return;
+  var left=Math.max(0,Math.round((pairing.exp-Date.now())/60000));
+  stage('<div class="pair">'+(pairing.church?'<div class="church">'+esc2(pairing.church)+'</div>':'')+
+    '<h1>Pair this screen</h1><div class="code">'+esc2(codeText(pairing.code))+'</div>'+
+    '<ol><li>On a phone or computer, open the dashboard and sign in</li><li>Go to <b>Now</b> and choose <b>Pair a TV</b></li><li>Type this code and pick which TV this is</li></ol>'+
+    '<div class="small">This code changes in about '+left+' minute'+(left===1?'':'s')+'. A new one appears on its own.</div></div>');
+}
+function startPairing(){
+  clearTimeout(pollTimer);clearInterval(loadTimer);loadTimer=null;
+  tag('Waiting to be paired');
+  google.script.run.withSuccessHandler(function(p){pairing=p;drawPairing();poll();})
+    .withFailureHandler(function(err){message('Can\'t reach the dashboard','Trying again in 30 seconds. ('+err.message+')');pollTimer=setTimeout(startPairing,30000);})
+    .startPairing({ua:navigator.userAgent});
+}
+function poll(){
+  pollTimer=setTimeout(function(){
+    if(!pairing)return;
+    if(Date.now()>pairing.exp){startPairing();return;}
+    google.script.run.withSuccessHandler(function(r){
+      if(r.paired){
+        store(DEVICE_KEY,r.deviceKey);pairing=null;
+        stage('<div class="pair"><div class="ok">Paired</div><div class="small">Loading this TV…</div></div>');
+        load();loadTimer=setInterval(load,15000);return;
+      }
+      if(r.expired){startPairing();return;}
+      drawPairing();poll();
+    }).withFailureHandler(function(){poll();}).checkPairing(pairing.code,pairing.secret);
+  },4000);
+}
+
+/* ---------- start ---------- */
+setInterval(function(){
+  if(D&&D.screen.slides.length>1&&Date.now()-lastSlideAt>=12000){slideIndex++;lastSlideAt=Date.now();}
+  draw(false);
+},1000);
+addEventListener('resize',fit);
+fit();
+load();
+if(PREVIEW||store(DEVICE_KEY))loadTimer=setInterval(load,15000);
+</script>
+</body>
+</html>

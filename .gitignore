@@ -1,0 +1,9 @@
+# Read-only copy of the live Graceview TV repo, kept for reference. Never commit it here.
+reference/
+
+# Android/Gradle build output and local secrets
+**/build/
+**/.gradle/
+**/local.properties
+*.keystore
+*.jks

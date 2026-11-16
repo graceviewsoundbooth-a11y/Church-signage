@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="a11y_description">Sends the remote\'s Home button to the Graceview home screen and lets the app turn the TV off on schedule.</string>
+</resources>

@@ -1,0 +1,1024 @@
+<!doctype html>
+<html>
+<head>
+<base target="_top">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Source+Sans+3:wght@300;400;600;700&display=swap">
+<style>
+/* Control panel: phone-first single column, cards for TVs, tables for schedule rows. */
+:root{
+  --bg:#F5F3F2;--surface:#FFFFFF;--sunk:#EEEAE8;--line:#DED7D4;--fg:#1C1A1A;--muted:#6A625F;
+  --brand:#B50606;--brand-fg:#FFFFFF;--ok:#1E7B4F;--warn:#9A5B00;--bad:#B42318;--info:#4B3FA8;
+  --head:Montserrat,'Segoe UI',Arial,sans-serif;--body:'Source Sans 3','Segoe UI',Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#151314;--surface:#1E1B1C;--sunk:#272324;--line:#3A3435;--fg:#F1ECEB;--muted:#A79E9B;
+  --brand:#EF5350;--brand-fg:#1B0505;--ok:#4CC38A;--warn:#E3A13B;--bad:#F07167;--info:#A99CF5;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 var(--body)}
+h1,h2,h3{font-family:var(--head);margin:0;text-wrap:balance}
+h2{font-size:22px}h3{font-size:17px}
+a{color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px max(16px,env(safe-area-inset-right));padding-left:max(16px,env(safe-area-inset-left));background:var(--surface);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .mk{width:34px;height:34px;border-radius:50%;border:3px solid var(--brand);display:grid;place-items:center;font:700 16px var(--head);color:var(--brand)}
+.brand h1{font-size:18px}
+.lab{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--info);border:1px solid currentColor;border-radius:999px;padding:1px 8px}
+.who{font-size:14px;color:var(--muted);text-align:right}
+.who b{color:var(--fg)}
+nav{display:flex;gap:4px;overflow-x:auto;padding:8px max(16px,env(safe-area-inset-left));background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+nav button{border:0;background:none;padding:8px 14px;border-radius:8px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+nav button.on{background:var(--sunk);color:var(--fg)}
+main{max-width:1240px;margin:0 auto;padding:20px max(16px,env(safe-area-inset-right)) 60px max(16px,env(safe-area-inset-left));display:flex;flex-direction:column;gap:20px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--sunk)}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:var(--brand-fg)}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.sm{padding:5px 10px;font-size:14px}
+.btn[disabled]{opacity:.5;cursor:default}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:14px;font-weight:600;min-width:0}
+input[type=text],input[type=date],input[type=time],input[type=url],select,textarea{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;min-width:0;width:100%}
+textarea{min-height:90px;resize:vertical}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.chip{display:inline-flex;align-items:center;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:700;letter-spacing:.02em;background:var(--sunk);white-space:nowrap}
+.chip.Override{background:var(--bad);color:#fff}
+.chip.Special{background:var(--info);color:#fff}
+.chip.ok{color:var(--ok)}.chip.warn{color:var(--warn)}.chip.bad{color:var(--bad)}
+.tog{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-weight:600;cursor:pointer}
+.tog.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.timebar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.timebar .now{font-weight:600}
+.timebar .now.pv{color:var(--info)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.tvbox{position:relative;width:100%;aspect-ratio:16/9;max-width:100%;overflow:hidden;background:#000}
+.card .cb{padding:12px 14px 14px;display:flex;flex-direction:column;gap:6px;flex:1}
+.card .ch{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.card .why{margin:0;font-size:14px}
+.card .meta{margin:0;font-size:13px;color:var(--muted)}
+.card .acts{margin-top:auto;padding-top:6px;display:flex;gap:8px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px}
+.dot.ok{background:var(--ok)}
+.banner{border:2px solid var(--bad);background:color-mix(in srgb,var(--bad) 8%,var(--surface))}
+.warnbox{border-left:4px solid var(--warn);padding:10px 14px;background:var(--sunk);border-radius:6px;font-size:15px}
+.twocol{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:20px;align-items:start}
+@media (max-width:860px){.twocol{grid-template-columns:1fr}}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.off td{opacity:.5}
+tr.flag td:first-child{box-shadow:inset 4px 0 var(--warn)}
+.week{display:grid;grid-template-columns:44px repeat(7,minmax(90px,1fr));min-width:760px;position:relative}
+.week .dh{font:700 13px var(--head);text-align:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.week .hrs{position:relative}
+.week .hrs span{position:absolute;right:6px;font-size:11px;color:var(--muted);transform:translateY(-50%)}
+.week .col{position:relative;border-left:1px solid var(--line);background:repeating-linear-gradient(to bottom,transparent 0,transparent 35px,var(--line) 35px,var(--line) 36px)}
+.blk{position:absolute;border-radius:6px;padding:3px 5px;font-size:11px;line-height:1.2;color:#fff;overflow:hidden;cursor:pointer;border:1px solid rgba(0,0,0,.25)}
+.blk.hid{background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.28) 0 6px,transparent 6px 12px)}
+.blk b{display:block;font-size:11px}
+.themes-list{display:flex;flex-direction:column;gap:8px}
+.themes-list button{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);cursor:pointer;text-align:left}
+.themes-list button.on{border-color:var(--fg);box-shadow:0 0 0 1px var(--fg)}
+.sw{width:22px;height:22px;border-radius:5px;border:1px solid rgba(0,0,0,.2);flex:none}
+.colorrow{display:flex;gap:8px;align-items:center}
+.colorrow input[type=color]{width:44px;height:40px;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:2px}
+.slide{display:grid;grid-template-columns:200px minmax(0,1fr);gap:14px;padding:12px;border:1px solid var(--line);border-radius:10px}
+@media (max-width:600px){.slide{grid-template-columns:1fr}}
+.cpairs{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.cpair{display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid var(--line);border-radius:10px;min-width:0}
+.cpair-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.swatch{border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:2px;border:1px solid rgba(0,0,0,.15)}
+.swatch .big{font-size:28px;font-weight:300;line-height:1.1}
+.swatch.bad{background:var(--sunk);color:var(--bad)}
+.gate{max-width:560px;margin:24px auto 0}
+.linkbox{border:2px solid var(--ok);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--sunk)}
+.roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.tog input{margin:0}
+.lnTiles{display:flex;flex-direction:column;gap:8px}
+.lnTile{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:10px;background:var(--sunk);position:relative}
+.drop.over{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 8%,var(--sunk))}
+.thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.vtag{position:absolute;left:8px;top:8px;background:rgba(0,0,0,.7);color:#fff;font-size:12px;font-weight:700;padding:2px 8px;border-radius:4px}
+.confirm{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px;border-radius:8px;background:var(--sunk)}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;display:none;max-width:90vw;z-index:20}
+#toast.bad{background:var(--bad);color:#fff}
+#busy{position:fixed;top:0;left:0;right:0;height:3px;background:var(--brand);transform:scaleX(0);transform-origin:left;transition:transform .4s}
+#busy.on{transform:scaleX(.8)}
+@media (prefers-reduced-motion:reduce){#busy{transition:none}}
+</style>
+</head>
+<body>
+<div id="busy"></div>
+<header class="top">
+  <div class="brand"><div class="mk">G</div><h1>Graceview TV</h1><span class="lab">Lab</span></div>
+  <div class="who" id="who">Loading…</div>
+</header>
+<nav id="nav" aria-label="Sections"></nav>
+<main id="main"><div class="panel">Loading the Sheet…</div></main>
+<div id="toast" role="status"></div>
+<script id="params" type="application/json"><?!= params ?></script>
+<?!= include('Screen') ?>
+<script>
+var S=null, view='now', preview='', edit=null, pendingDelete=null, schedFilter='all';
+var themeForm=null, slideTheme=null, ov=null, ovConfirm=false;
+var DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var VIEWS=[['now','Now',null],['devices','Devices',null],['override','Override','override'],['schedule','Schedule','schedule'],['themes','Themes','theme'],['slides','Slides','slides'],
+  ['activity','Activity','activity'],['launchers','Launchers','launchers'],['greenroom','Green Room','greenroom'],['people','People','users'],['account','Account',null]];
+var P=JSON.parse(document.getElementById('params').textContent||'{}');
+var INVITE=P.invite||'', INV=null, userEdit=null, newLink=null;
+
+/* Sign-in token, kept in this browser only. */
+var TOKEN_KEY='gvlab-token';
+var TOKEN=(function(){try{return localStorage.getItem(TOKEN_KEY)||'';}catch(e){return '';}})();
+function setToken(t){TOKEN=t||'';try{if(t)localStorage.setItem(TOKEN_KEY,t);else localStorage.removeItem(TOKEN_KEY);}catch(e){}}
+
+/* ---------- server calls ---------- */
+function busy(on){document.getElementById('busy').className=on?'on':'';}
+function toast(msg,bad){var t=document.getElementById('toast');t.textContent=msg;t.className=bad?'bad':'';t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(function(){t.style.display='none';},bad?7000:2500);}
+function fail(e){busy(false);toast((e&&e.message)||String(e),true);}
+function load(){busy(true);google.script.run.withSuccessHandler(function(st){S=st;busy(false);render();}).withFailureHandler(fail).getState(preview,TOKEN);}
+/* Every change sends the sign-in token last, so the server knows who is asking. */
+function call(fn,args,okMsg,after){
+  busy(true);
+  var r=google.script.run.withSuccessHandler(function(res){if(after)after(res);if(okMsg)toast(okMsg);load();}).withFailureHandler(fail);
+  r[fn].apply(r,args.concat([TOKEN]));
+}
+function can(p){return !p||(S.perms||[]).indexOf(p)>=0;}
+
+/* ---------- shared rules (same as the server) ---------- */
+function dayset(day){if(day==='Daily')return [0,1,2,3,4,5,6];if(day==='Weekdays')return [1,2,3,4,5];if(day==='Weekends')return [0,6];var i=DAYS.indexOf(day);return i<0?[]:[i];}
+function mins(h){var m=String(h||'').match(/^(\d{1,2}):(\d{2})/);return m?+m[1]*60+ +m[2]:null;}
+function endMins(h){var m=mins(h);return m===null?1440:(m===1439?1440:m);}
+function targets(list,dev){return String(list||'').split(',').map(function(x){return x.trim().toUpperCase();}).filter(String).some(function(u){
+  return u==='ALL'||(u==='ALL SIGNAGE'&&dev.profile==='Signage')||(u==='CLASSROOMS'&&dev.profile==='Classroom')||u===String(dev.name).toUpperCase()||u===String(dev.id).toUpperCase();});}
+function addDays(ymd,n){var d=new Date(ymd+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
+function nextDow(ymd,dow){var cur=new Date(ymd+'T12:00:00Z').getUTCDay();return addDays(ymd,(dow-cur+7)%7);}
+function niceStamp(t){var p=ymdParts(t.ymd),c=clockParts(t.mins);return p.dow+', '+p.month+' '+p.day+', '+c.t+' '+c.ap;}
+function themeColor(name){var t=(S.themeObjs||[]).filter(function(x){return x.name===name;})[0];return t?t.main:'#666';}
+function lum(hex){var c=hex.replace('#','');if(c.length===3)c=c.split('').map(function(x){return x+x;}).join('');
+  return [0,2,4].map(function(i){var v=parseInt(c.substr(i,2),16)/255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);})
+    .reduce(function(s,v,i){return s+v*[0.2126,0.7152,0.0722][i];},0);}
+function opts(list,sel){return list.map(function(v){return '<option'+(v===sel?' selected':'')+'>'+esc(v)+'</option>';}).join('');}
+function clk(){return {ymd:S.t.ymd,mins:S.t.mins,secs:0};}
+
+/* ---------- layout ---------- */
+function render(){
+  var who=document.getElementById('who'),nav=document.getElementById('nav'),m=document.getElementById('main');
+  if(INVITE){who.innerHTML='';nav.innerHTML='';m.innerHTML=vInvite();return;}
+  if(S.state){
+    who.innerHTML='';nav.innerHTML='';
+    m.innerHTML=S.state==='Setup'?vSetup():S.state==='SignIn'?vSignIn():vNotReady();
+    return;
+  }
+  who.innerHTML='<b>'+esc(S.me.name)+'</b><br>'+esc(S.me.role)+(S.me.role==='Limited'?' · '+esc(S.me.themes.join(', ')):'');
+  var allowed=VIEWS.filter(function(v){return can(v[2]);});
+  if(!allowed.some(function(v){return v[0]===view;}))view='now';
+  nav.innerHTML=allowed.map(function(v){return '<button data-act="view" data-v="'+v[0]+'" class="'+(v[0]===view?'on':'')+'">'+v[1]+'</button>';}).join('');
+  m.innerHTML=overrideBanner()+({now:vNow,devices:vDevices,override:vOverride,schedule:vSchedule,themes:vThemes,slides:vSlides,activity:vActivity,launchers:vLaunchers,greenroom:vGreenRoom,people:vPeople,account:vAccount}[view])();
+  fitScreens(m);
+}
+function overrideBanner(){
+  var o=S.override;if(o.Active!=='TRUE'||view==='override')return '';
+  return '<div class="panel banner"><div class="row" style="justify-content:space-between"><div><b>Override is on:</b> '+esc(o.Mode)+' on '+esc(o.Devices)+
+    (o['Ends At']?', until '+esc(o['Ends At']):', until someone ends it')+'</div>'+(can('override')?'<button class="btn danger" data-act="endOv">End override</button>':'')+'</div></div>';
+}
+
+/* ---------- Now ---------- */
+function timeBar(){
+  var td=S.t.today,ps=[
+    ['Sunday 9:45 AM',nextDow(td,0)+'T09:45'],['Sunday 10:45 AM',nextDow(td,0)+'T10:45'],['Wednesday 4:30 PM',nextDow(td,3)+'T16:30'],
+    ['Thanksgiving',td.slice(0,4)+'-11-26T10:00'],['Christmas Eve 4 PM',td.slice(0,4)+'-12-24T16:00'],['Saturday 11 PM',nextDow(td,6)+'T23:00']];
+  return '<section class="panel"><div class="timebar"><div class="now'+(S.t.preview?' pv':'')+'">'+(S.t.preview?'Previewing ':'Live now: ')+esc(niceStamp(S.t))+'</div>'+
+    (S.t.preview?'<button class="btn sm" data-act="at" data-at="">Back to live</button>':'')+'</div>'+
+    '<div class="row">'+ps.map(function(p){return '<button class="tog'+(preview===p[1]?' on':'')+'" data-act="at" data-at="'+p[1]+'">'+p[0]+'</button>';}).join('')+'</div>'+
+    '<div class="row"><input type="date" id="pvDate" value="'+S.t.ymd+'" style="width:auto"><input type="time" id="pvTime" value="'+String(Math.floor(S.t.mins/60)).padStart(2,'0')+':'+String(S.t.mins%60).padStart(2,'0')+'" style="width:auto">'+
+    '<button class="btn sm" data-act="atCustom">Preview this time</button><span class="muted small">Previews don\'t change anything. They show what each TV would show.</span></div></section>';
+}
+function vNow(){
+  var on=S.devices.filter(function(d){return d.now.mode!=='Off';}).length;
+  return timeBar()+(pairForm?vPairForm():'')+'<div class="row" style="justify-content:space-between"><div class="muted">'+on+' of '+S.devices.length+' TVs showing something'+(S.conflicts.length?' · <a href="#" data-act="view" data-v="schedule">'+S.conflicts.length+' schedule overlap'+(S.conflicts.length>1?'s':'')+'</a>':'')+'</div>'+(isAdmin()&&!pairForm?'<button class="btn pri" data-act="pairOpen">Pair a TV</button>':'')+'</div>'+
+    '<div class="grid">'+S.devices.map(card).join('')+'</div>';
+}
+function card(d){
+  var src=d.now.source==='Special Date'?'Special':d.now.source;
+  var link=S.url+'?tv='+encodeURIComponent(d.id)+(S.t.preview?'&at='+encodeURIComponent(preview):'');
+  return '<article class="card"><div class="tvbox">'+renderScreen(d.screen,clk(),S.weather,{qr:false})+'</div><div class="cb">'+
+    '<div class="ch"><h3>'+esc(d.name)+'</h3><span class="chip '+esc(src)+'">'+esc(d.now.mode)+'</span></div>'+
+    '<p class="why">'+esc(d.now.label)+'</p>'+
+    '<p class="meta">'+esc(d.screen.theme.name)+' theme · '+esc(d.profile)+'</p>'+
+    '<p class="meta"><span class="dot'+(d.pairedAt?' ok':'')+'"></span>'+(d.pairedAt?'Paired '+esc(d.pairedAt)+(d.lastSeen?' · last checked in '+esc(d.lastSeen):''):'No screen paired')+'</p>'+
+    '<div class="acts"><a class="btn sm" href="'+esc(link)+'" target="_blank" rel="noopener" title="See what this TV shows. Previews never count as the TV checking in.">Preview</a>'+
+    (isAdmin()&&d.pairedAt?(pendingDelete==='tv:'+d.id?'<button class="btn sm danger" data-act="unpairGo" data-id="'+esc(d.id)+'">Confirm unpair</button>':'<button class="btn sm" data-act="unpairAsk" data-id="'+esc(d.id)+'">Unpair</button>'):'')+
+    (can('override')?'<button class="btn sm" data-act="ovFor" data-name="'+esc(d.name)+'">Override</button>':'')+'</div></div></article>';
+}
+
+/* ---------- Override ---------- */
+function ovDefaults(){return {targets:['ALL SIGNAGE'],mode:'Message',theme:(S.themes[0]||{}).Theme||'',message:'',duration:'60'};}
+function ovDevices(){return ov.targets.indexOf('ALL')>=0?'ALL':ov.targets.join(', ');}
+function ovAffected(){var t=ovDevices();return S.allDevices.filter(function(d){return targets(t,d);});}
+function ovPreview(){
+  var aff=ovAffected(),base=null;
+  for(var i=0;i<S.devices.length&&!base;i++)if(aff.some(function(a){return a.id===S.devices[i].id;}))base=S.devices[i];
+  if(!base)return '<p class="muted">Pick a TV to see a preview.</p>';
+  var th=S.themeObjs.filter(function(x){return x.name===ov.theme;})[0]||base.screen.theme;
+  var scr=JSON.parse(JSON.stringify(base.screen));
+  scr.mode=ov.mode;scr.message=ov.message||'Your message shows here.';scr.theme=th;
+  scr.slides=S.slidesByTheme[th.name]||[];scr.events=S.eventsByTheme[th.name]||[];
+  return '<div class="muted small">Preview on '+esc(base.name)+'</div><div class="tvbox">'+renderScreen(scr,clk(),S.weather,{qr:false})+'</div>';
+}
+function vOverride(){
+  if(!ov)ov=ovDefaults();
+  var o=S.override,active=o.Active==='TRUE',h='';
+  if(active){
+    h+='<section class="panel banner"><h2>Override is on</h2><p>'+esc(o.Mode)+' on <b>'+esc(o.Devices)+'</b> with the '+esc(o.Theme)+' theme'+
+      (o.Message?': “'+esc(o.Message)+'”':'')+'</p><p class="muted small">Started by '+esc(o['Started By'])+' at '+esc(o['Started At'])+(o['Ends At']?'. Ends at '+esc(o['Ends At'])+' on its own.':'. Stays on until someone ends it.')+
+      '</p><div class="row"><button class="btn pri" data-act="endOv">End override</button></div></section>';
+  }
+  var chips=['ALL','ALL SIGNAGE','CLASSROOMS'].concat(S.allDevices.map(function(d){return d.name;}));
+  var aff=ovAffected();
+  h+='<section class="panel"><h2>'+(active?'Replace the override':'Start an override')+'</h2>'+
+    '<p class="muted small">An override wins over every schedule until it ends. Virtual TVs pick it up within 15 seconds.</p>'+
+    (S.presets.length?'<div><div class="small" style="font-weight:600;margin-bottom:6px">Ready-made</div><div class="row">'+S.presets.map(function(p,i){return '<button class="btn sm" data-act="preset" data-i="'+i+'">'+esc(p.Name)+'</button>';}).join('')+'</div></div>':'')+
+    '<div><div class="small" style="font-weight:600;margin-bottom:6px">Which TVs</div><div class="row">'+chips.map(function(c){return '<button class="tog'+(ov.targets.indexOf(c)>=0?' on':'')+'" data-act="ovTarget" data-t="'+esc(c)+'" aria-pressed="'+(ov.targets.indexOf(c)>=0)+'">'+esc(c)+'</button>';}).join('')+'</div>'+
+    '<div class="muted small" style="margin-top:6px">'+(aff.length?aff.length+' TV'+(aff.length>1?'s':'')+': '+esc(aff.map(function(a){return a.name;}).join(', ')):'No TVs picked')+'</div></div>'+
+    '<div class="fgrid"><label class="f">Show<select data-f="ov.mode">'+opts(['Message','Signage','Fullscreen','Live','Off'],ov.mode)+'</select></label>'+
+    '<label class="f">Theme<select data-f="ov.theme">'+opts(S.themes.map(function(t){return t.Theme;}),ov.theme)+'</select></label>'+
+    '<label class="f">Ends<select data-f="ov.duration">'+[['30','In 30 minutes'],['60','In 1 hour'],['120','In 2 hours'],['eod','At the end of today'],['','When someone ends it']].map(function(x){return '<option value="'+x[0]+'"'+(ov.duration===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select></label></div>'+
+    (ov.mode==='Message'?'<label class="f">Message<textarea data-f="ov.message" maxlength="240" placeholder="Short and readable from across the room">'+esc(ov.message)+'</textarea></label>':'')+
+    '<div id="ovPrev">'+ovPreview()+'</div>'+
+    (ovConfirm?'<div class="confirm"><b>Start '+esc(ov.mode)+' on '+aff.length+' TV'+(aff.length===1?'':'s')+'?</b><button class="btn pri" data-act="ovGo">Start override</button><button class="btn" data-act="ovCancel">Cancel</button></div>'
+      :'<div class="row"><button class="btn pri" data-act="ovAsk"'+(aff.length?'':' disabled')+'>Start override…</button></div>')+'</section>';
+  return h;
+}
+
+/* ---------- Schedule ---------- */
+function rowConflicts(row){return S.conflicts.filter(function(c){return c.row===row;});}
+function vSchedule(){
+  var h='';
+  if(S.conflicts.length){
+    h+='<section class="panel"><h2>Overlaps</h2>'+S.conflicts.map(function(c){
+      return '<div class="warnbox">Row '+c.row+' is hidden by row '+c.by+' for '+esc(c.devices.join(', '))+' on '+esc(c.days.join(', '))+' from '+esc(fmtTime(c.start))+' to '+esc(fmtTime(c.end))+'. Higher rows win, so move row '+c.row+' up if it should win.</div>';}).join('')+'</section>';
+  }
+  var devs=S.allDevices;
+  h+='<section class="panel"><div class="row" style="justify-content:space-between"><h2>Weekly schedule</h2><div class="row"><label class="small" for="schedFilter">Show</label><select id="schedFilter" data-f="schedFilter" style="width:auto"><option value="all">All TVs</option>'+
+    devs.map(function(d){return '<option value="'+esc(d.id)+'"'+(schedFilter===d.id?' selected':'')+'>'+esc(d.name)+'</option>';}).join('')+'</select></div></div>'+
+    '<div class="tbl">'+weekGrid()+'</div>'+
+    '<p class="muted small">Striped blocks are partly hidden by a higher row. Click a block to edit it.</p></section>';
+  h+='<section class="panel"><div class="row" style="justify-content:space-between"><h2>Weekly rows</h2><button class="btn pri" data-act="newW">Add a row</button></div>'+
+    (edit&&edit.kind==='weekly'?weeklyForm():'')+
+    '<div class="tbl"><table><thead><tr><th>Row</th><th>On</th><th>Day</th><th>Time</th><th>TVs</th><th>Show</th><th>Theme</th><th></th></tr></thead><tbody>'+
+    S.weekly.map(function(r,i){
+      var fl=rowConflicts(r._row).length;
+      return '<tr class="'+(r.Enabled==='TRUE'?'':'off')+(fl?' flag':'')+'"><td class="num">'+r._row+'</td><td>'+(r.Enabled==='TRUE'?'Yes':'No')+'</td><td>'+esc(r.Day)+'</td><td class="num">'+esc(fmtRange(r.Start,r.End))+'</td><td>'+esc(r.Devices)+'</td><td>'+esc(r.Mode)+'</td><td><span class="sw" style="display:inline-block;vertical-align:middle;width:12px;height:12px;background:'+esc(safeColor(themeColor(r.Theme),'#666'))+'"></span> '+esc(r.Theme)+'</td>'+
+        '<td><div class="row" style="flex-wrap:nowrap"><button class="btn sm" data-act="editW" data-i="'+i+'">Edit</button><button class="btn sm" data-act="moveW" data-row="'+r._row+'" data-dir="-1" aria-label="Move up"'+(i===0?' disabled':'')+'>↑</button><button class="btn sm" data-act="moveW" data-row="'+r._row+'" data-dir="1" aria-label="Move down"'+(i===S.weekly.length-1?' disabled':'')+'>↓</button>'+
+        (pendingDelete==='Weekly:'+r._row?'<button class="btn sm danger" data-act="delGo" data-tab="Weekly" data-row="'+r._row+'">Confirm delete</button>':'<button class="btn sm danger" data-act="delAsk" data-tab="Weekly" data-row="'+r._row+'">Delete</button>')+'</div></td></tr>';
+    }).join('')+'</tbody></table></div></section>';
+  h+='<section class="panel"><div class="row" style="justify-content:space-between"><h2>Special dates</h2><button class="btn pri" data-act="newS">Add a date</button></div>'+
+    '<p class="muted small">Special dates win over the weekly schedule. Only an override beats them.</p>'+
+    (edit&&edit.kind==='special'?specialForm():'')+
+    '<div class="tbl"><table><thead><tr><th>Name</th><th>Dates</th><th>Time</th><th>TVs</th><th>Show</th><th>Theme</th><th></th></tr></thead><tbody>'+
+    S.special.map(function(r,i){
+      return '<tr class="'+(r.Enabled==='TRUE'?'':'off')+'"><td>'+esc(r.Name)+'</td><td class="num">'+esc(r.From)+(r.To&&r.To!==r.From?' to '+esc(r.To):'')+'</td><td class="num">'+esc(fmtRange(r.Start,r.End))+'</td><td>'+esc(r.Devices)+'</td><td>'+esc(r.Mode)+'</td><td>'+esc(r.Theme)+'</td>'+
+        '<td><div class="row" style="flex-wrap:nowrap"><button class="btn sm" data-act="editS" data-i="'+i+'">Edit</button>'+
+        (pendingDelete==='Special Dates:'+r._row?'<button class="btn sm danger" data-act="delGo" data-tab="Special Dates" data-row="'+r._row+'">Confirm delete</button>':'<button class="btn sm danger" data-act="delAsk" data-tab="Special Dates" data-row="'+r._row+'">Delete</button>')+'</div></td></tr>';
+    }).join('')+'</tbody></table></div></section>';
+  return h;
+}
+function weekGrid(){
+  var H=36,START=6,END=23,f=schedFilter==='all'?null:S.allDevices.filter(function(d){return d.id===schedFilter;})[0];
+  var hidden={};S.conflicts.forEach(function(c){if(!f||c.devices.indexOf(f.name)>=0)hidden[c.row]=1;});
+  var h='<div class="week"><div class="dh"></div>'+DAYS.map(function(d){return '<div class="dh">'+d+'</div>';}).join('');
+  h+='<div class="hrs" style="height:'+((END-START)*H)+'px">';
+  for(var k=START+1;k<END;k++)h+='<span style="top:'+((k-START)*H)+'px">'+(k%12||12)+(k<12?'a':'p')+'</span>';
+  h+='</div>';
+  for(var day=0;day<7;day++){
+    var items=S.weekly.map(function(r,i){return {r:r,i:i,s:mins(r.Start),e:endMins(r.End)};}).filter(function(x){
+      return x.s!==null&&dayset(x.r.Day).indexOf(day)>=0&&(!f||targets(x.r.Devices,f));});
+    var lanes=[];items.forEach(function(x){var l=0;while(lanes[l]&&lanes[l]>x.s)l++;lanes[l]=x.e;x.l=l;});
+    var n=Math.max(1,lanes.length);
+    h+='<div class="col" style="height:'+((END-START)*H)+'px">'+items.map(function(x){
+      var top=Math.max(0,(x.s-START*60)/60*H),bot=Math.min((END-START)*H,(x.e-START*60)/60*H);if(bot<=top)return '';
+      return '<div class="blk'+(hidden[x.r._row]?' hid':'')+'" data-act="editW" data-i="'+x.i+'" title="Row '+x.r._row+': '+esc(x.r.Devices+' · '+x.r.Mode+' · '+fmtRange(x.r.Start,x.r.End))+'" style="top:'+top+'px;height:'+(bot-top-2)+'px;left:'+(x.l/n*100)+'%;width:calc('+(100/n)+'% - 3px);background:'+esc(safeColor(themeColor(x.r.Theme),'#666'))+';opacity:'+(x.r.Enabled==='TRUE'?1:.4)+'"><b>'+esc(x.r.Mode)+'</b>'+esc(x.r.Devices)+'</div>';
+    }).join('')+'</div>';
+  }
+  return h+'</div>';
+}
+function deviceField(id,val){
+  return '<label class="f">TVs<input type="text" id="'+id+'" value="'+esc(val)+'" list="devlist" placeholder="ALL SIGNAGE, Lobby"><datalist id="devlist">'+
+    ['ALL','ALL SIGNAGE','CLASSROOMS'].concat(S.allDevices.map(function(d){return d.name;})).map(function(x){return '<option value="'+esc(x)+'">';}).join('')+'</datalist></label>';
+}
+function weeklyForm(){
+  var r=edit.r;
+  return '<div class="panel" style="background:var(--sunk)"><h3>'+(r._row?'Edit row '+r._row:'New weekly row')+'</h3><div class="fgrid">'+
+    '<label class="f">Day<select id="wDay">'+opts(S.days,r.Day)+'</select></label>'+
+    '<label class="f">Start<input type="time" id="wStart" value="'+esc(r.Start)+'"></label>'+
+    '<label class="f">End<input type="time" id="wEnd" value="'+esc(r.End)+'"></label>'+deviceField('wDevices',r.Devices)+
+    '<label class="f">Show<select id="wMode">'+opts(S.modes,r.Mode)+'</select></label>'+
+    '<label class="f">Theme<select id="wTheme">'+opts(S.themes.map(function(t){return t.Theme;}),r.Theme)+'</select></label>'+
+    '<label class="f">Note<input type="text" id="wNote" value="'+esc(r.Note||'')+'"></label>'+
+    '<label class="f">On<select id="wEnabled"><option value="1"'+(r.Enabled!=='FALSE'?' selected':'')+'>Yes</option><option value=""'+(r.Enabled==='FALSE'?' selected':'')+'>No</option></select></label></div>'+
+    '<div class="row"><button class="btn pri" data-act="saveW">Save</button><button class="btn" data-act="cancelEdit">Cancel</button></div></div>';
+}
+function specialForm(){
+  var r=edit.r;
+  return '<div class="panel" style="background:var(--sunk)"><h3>'+(r._row?'Edit '+esc(r.Name):'New special date')+'</h3><div class="fgrid">'+
+    '<label class="f">Name<input type="text" id="sName" value="'+esc(r.Name||'')+'"></label>'+
+    '<label class="f">First day<input type="date" id="sFrom" value="'+esc(r.From||'')+'"></label>'+
+    '<label class="f">Last day<input type="date" id="sTo" value="'+esc(r.To||'')+'"></label>'+
+    '<label class="f">Start<input type="time" id="sStart" value="'+esc(r.Start||'')+'"></label>'+
+    '<label class="f">End<input type="time" id="sEnd" value="'+esc(r.End||'')+'"></label>'+deviceField('sDevices',r.Devices||'ALL SIGNAGE')+
+    '<label class="f">Show<select id="sMode">'+opts(S.modes,r.Mode||'Signage')+'</select></label>'+
+    '<label class="f">Theme<select id="sTheme">'+opts(S.themes.map(function(t){return t.Theme;}),r.Theme)+'</select></label>'+
+    '<label class="f">On<select id="sEnabled"><option value="1"'+(r.Enabled!=='FALSE'?' selected':'')+'>Yes</option><option value=""'+(r.Enabled==='FALSE'?' selected':'')+'>No</option></select></label></div>'+
+    '<div class="row"><button class="btn pri" data-act="saveS">Save</button><button class="btn" data-act="cancelEdit">Cancel</button></div></div>';
+}
+
+/* ---------- Themes ---------- */
+var THEME_FIELDS=[['Display Name','Name on screens'],['Logo URL','Logo link (https, optional)'],['Wayfinding Left','Left arrows, separated by ;'],['Wayfinding Right','Right arrows, separated by ;'],
+  ['QR Label','QR code label'],['QR Link','QR code link'],['Wi-Fi Name','Guest Wi-Fi name'],['Wi-Fi Password','Guest Wi-Fi password'],
+  ['Calendar','Calendar links: webcal, .ics or Google Calendar ID (separate with ;)'],['Calendar Hide','Hide events containing (;)'],
+  ['Slides Folder','Slides folder (Google Drive folder link)']];
+function calNote(){
+  var c=(S.calStatus||{})[themeForm.Theme]||{},saved=(S.themes.filter(function(t){return t.Theme===themeForm.Theme;})[0]||{}).Calendar||'';
+  var h='';
+  if(String(themeForm.Calendar||'')!==saved)h+='<div class="small muted">Save to load the new calendar link. The preview still shows the saved one.</div>';
+  if(!c.linked)return h+'<div class="small muted">No calendar linked, so This Week stays empty.</div>';
+  (c.errors||[]).forEach(function(e){h+='<div class="warnbox">'+esc(e)+'</div>';});
+  if(!(c.errors||[]).length)h+='<div class="small"><span class="chip ok">Calendar loaded</span> '+c.count+' event'+(c.count===1?'':'s')+' in the next 7 days, after hiding.</div>';
+  return h;
+}
+/* Slides folder status for a theme, with the fix when there is one. */
+function isAdmin(){return S.me.role==='Owner'||S.me.role==='Admin';}
+function folderNote(theme){
+  var f=(S.folders||{})[theme]||{linked:false};
+  if(!f.linked)return '<div class="warnbox">The '+esc(theme)+' theme has no slides folder yet. '+
+    (isAdmin()?'<button class="btn sm" data-act="mkFolder" data-t="'+esc(theme)+'">Create one in Google Drive</button>':'Ask an Admin to create one.')+'</div>';
+  if(f.error)return '<div class="warnbox">'+esc(f.error)+'</div>';
+  if(f.shared===false)return '<div class="warnbox">This folder is private, so other people and the TVs can\'t load its slides. '+
+    (isAdmin()?'<button class="btn sm" data-act="shareFolder" data-t="'+esc(theme)+'">Make viewable by link</button>':'Ask an Admin to share it.')+'</div>';
+  return '<div class="small"><span class="chip ok">Slides folder shared by link</span> '+esc(f.name||'')+
+    (f.url?' · <a href="'+esc(f.url)+'" target="_blank" rel="noopener">Open in Drive</a>':'')+'</div>';
+}
+var addingTheme=false, themeDel=null;
+/* Fallback status, "make fallback" and delete (with what it would change) for Owner and Admins. */
+function themeAdminBox(theme){
+  if(!isAdmin())return '';
+  if(theme===S.fallbackTheme)return '<div class="small"><span class="chip">Fallback theme</span> TVs use this theme when theirs is deleted or missing. To delete it, make another theme the fallback first.</div>';
+  var h='<div class="row"><button class="btn sm" data-act="themeFallback" data-t="'+esc(theme)+'">Make this the fallback theme</button>';
+  if(!themeDel||themeDel.theme!==theme)return h+'<button class="btn sm danger" data-act="themeDelAsk" data-t="'+esc(theme)+'">Delete theme…</button></div>';
+  h+='</div>';
+  var u=themeDel.usage;
+  if(!u)return h+'<div class="confirm">Checking what uses '+esc(theme)+'…</div>';
+  var lines=[];
+  if(u.devices.length)lines.push(u.devices.length+' TV'+(u.devices.length===1?'':'s')+' ('+esc(u.devices.join(', '))+') will switch to <b>'+esc(u.fallback)+'</b> until you pick another theme');
+  if(u.scheduleRows)lines.push(u.scheduleRows+' schedule row'+(u.scheduleRows===1?'':'s')+' will follow each TV’s own theme');
+  if(u.override)lines.push('the override will follow each TV’s own theme');
+  if(u.presets.length)lines.push('preset'+(u.presets.length===1?' ':'s ')+esc(u.presets.join(', '))+' will follow each TV’s own theme');
+  if(u.users.length)lines.push(esc(u.users.join(', '))+' will lose access to it');
+  return h+'<div class="confirm" style="flex-direction:column;align-items:flex-start"><b>Delete '+esc(theme)+'?</b>'+
+    (lines.length?'<ul class="small" style="margin:0;padding-left:20px"><li>'+lines.join('</li><li>')+'</li></ul>':'<span class="small">Nothing uses it.</span>')+
+    '<span class="small muted">Its slides folder stays in Google Drive. This can’t be undone from the dashboard.</span>'+
+    '<div class="row"><button class="btn danger" data-act="themeDelGo" data-t="'+esc(theme)+'">Delete theme</button><button class="btn" data-act="themeDelCancel">Cancel</button></div></div>';
+}
+function addThemeForm(){
+  return '<div class="panel" style="background:var(--sunk)"><h3>Add a theme</h3>'+
+    '<p class="small muted" style="margin:0">For a ministry, event or group that needs its own colors and slides (Youth, VBS, a renter). A shared slides folder is made for it in Google Drive.</p>'+
+    '<div class="fgrid"><label class="f">Name<input type="text" id="ntName" placeholder="Youth"></label>'+
+    '<label class="f">Name on screens<input type="text" id="ntDisplay" placeholder="Graceview Youth"></label>'+
+    '<label class="f">Main color<input type="color" id="ntMain" value="#333333"></label>'+
+    '<label class="f">Accent color<input type="color" id="ntAccent" value="#555555"></label></div>'+
+    '<div class="row"><button class="btn pri" data-act="addThemeGo">Add theme</button><button class="btn" data-act="addThemeCancel">Cancel</button></div></div>';
+}
+function vThemes(){
+  if(themeForm&&themeForm.Main===undefined){var nt=S.themes.filter(function(t){return t.Theme===themeForm.Theme;})[0];themeForm=nt?JSON.parse(JSON.stringify(nt)):null;}
+  if(!themeForm||!S.themes.some(function(t){return t.Theme===themeForm.Theme;}))themeForm=JSON.parse(JSON.stringify(S.themes[0]||{}));
+  var list='<div class="themes-list">'+S.themes.map(function(t){return '<button data-act="pickTheme" data-t="'+esc(t.Theme)+'" class="'+(t.Theme===themeForm.Theme?'on':'')+'"><span class="sw" style="background:'+esc(safeColor(t.Main,'#666'))+'"></span><span class="sw" style="background:'+esc(safeColor(t.Accent,'#666'))+'"></span><span><b>'+esc(t.Theme)+'</b>'+(t.Theme===S.fallbackTheme?' <span class="chip">Fallback</span>':'')+'<br><span class="muted small">'+esc(t['Display Name'])+'</span></span></button>';}).join('')+'</div>'+(isAdmin()?(addingTheme?addThemeForm():'<button class="btn sm" data-act="addTheme">+ Add a theme</button>'):'');
+  var f=themeForm;
+  var colors='<div class="cpairs">'+COLOR_PAIRS.map(colorPair).join('')+'</div>';
+  var form='<div class="fgrid">'+THEME_FIELDS.map(function(x){return '<label class="f">'+x[1]+'<input type="text" data-f="th.'+x[0]+'" value="'+esc(f[x[0]]||'')+'"></label>';}).join('')+'</div>';
+  return '<section class="panel"><h2>Themes</h2><div class="twocol"><div style="display:flex;flex-direction:column;gap:14px">'+list+colors+form+
+    '<div id="thCal">'+calNote()+'</div>'+folderNote(f.Theme)+themeAdminBox(f.Theme)+'<div class="row"><button class="btn pri" data-act="saveTheme">Save '+esc(f.Theme)+'</button><button class="btn" data-act="resetTheme">Undo changes</button></div></div>'+
+    '<div><div class="muted small" style="margin-bottom:6px">Preview with wayfinding</div><div class="tvbox" id="thPrev">'+themePreview()+'</div>'+
+    '<div class="muted small" style="margin:12px 0 6px">Preview without wayfinding</div><div class="tvbox" id="thPrev2">'+themePreview(true)+'</div></div></div></section>';
+}
+function themeObjFromForm(f){
+  var sp=function(s){return String(s||'').split(';').map(function(x){return x.trim();}).filter(String);};
+  return {name:f.Theme,display:f['Display Name']||f.Theme,main:f.Main,accent:f.Accent,logo:f['Logo URL'],wayL:sp(f['Wayfinding Left']),wayR:sp(f['Wayfinding Right']),
+    qrLabel:f['QR Label']||'Info',qrLink:f['QR Link'],wifiName:f['Wi-Fi Name'],wifiPass:f['Wi-Fi Password'],
+    mainText:f['Main Text']||'#FFFFFF',accentText:f['Accent Text']||'#FFFFFF'};
+}
+
+/* Background + text color pairs, each with a sample, two pickers, a suggestion and a readability check. */
+var COLOR_PAIRS=[['Main','Main Text','Main'],['Accent','Accent Text','Accent']];
+function isHex(c){return /^#[0-9a-fA-F]{6}$/.test(c||'');}
+function contrast(a,b){var A=lum(a),B=lum(b);return (Math.max(A,B)+0.05)/(Math.min(A,B)+0.05);}
+function colorInput(k,label,fallback){
+  var v=themeForm[k]||fallback;
+  return '<label class="f">'+label+'<span class="colorrow"><input type="color" data-f="th.'+k+'" value="'+esc(isHex(v)?v:fallback)+'" aria-label="'+esc(label)+' picker">'+
+    '<input type="text" data-f="th.'+k+'" value="'+esc(v)+'" maxlength="7" aria-label="'+esc(label)+' hex code"></span></label>';
+}
+function swatchHTML(p){
+  var bg=themeForm[p[0]],tx=themeForm[p[1]]||'#FFFFFF';
+  if(!isHex(bg)||!isHex(tx))return '<div class="swatch bad">Colors need to look like #CF2020.</div>';
+  var c=contrast(bg,tx),ok=c>=4.5;
+  return '<div class="swatch" style="background:'+bg+';color:'+tx+'"><span class="big">10:45 AM</span><span>This Week · Fellowship Hall →</span></div>'+
+    '<div class="small"><span class="chip '+(ok?'ok':'warn')+'">'+c.toFixed(1)+':1</span> '+
+    (ok?'Easy to read.':(c>=3?'Readable up close, but hard from across the room. Aim for 4.5:1 or more.':'Hard to read. Try "Suggest text color".'))+'</div>';
+}
+function colorPair(p){
+  return '<div class="cpair"><div class="cpair-h"><b>'+p[2]+' color</b><button class="btn sm" data-act="suggestText" data-bg="'+p[0]+'" data-tx="'+p[1]+'">Suggest text color</button></div>'+
+    '<div id="sw-'+p[0]+'">'+swatchHTML(p)+'</div>'+
+    '<div class="fgrid">'+colorInput(p[0],'Background','#666666')+colorInput(p[1],'Text','#FFFFFF')+'</div></div>';
+}
+function themePreview(noWay){
+  var f=themeForm;
+  var scr={device:{id:'PREVIEW',name:'Preview',profile:'Signage',mute:false,wayfinding:!noWay},mode:'Signage',message:'',endMins:null,
+    theme:themeObjFromForm(f),slides:S.slidesByTheme[f.Theme]||[],events:S.eventsByTheme[f.Theme]||[]};
+  return renderScreen(scr,clk(),S.weather,{qr:true});
+}
+function refreshThemePreview(){
+  var a=document.getElementById('thPrev'),b=document.getElementById('thPrev2');
+  if(a)a.innerHTML=themePreview();if(b)b.innerHTML=themePreview(true);
+  COLOR_PAIRS.forEach(function(p){var s=document.getElementById('sw-'+p[0]);if(s)s.innerHTML=swatchHTML(p);});
+  var k=document.getElementById('thCal');if(k)k.innerHTML=calNote();fitScreens(document);
+}
+
+/* ---------- Slides ---------- */
+function fileStatus(f){
+  var y=S.t.ymd;
+  if(f.from&&f.from>y)return ['Starts '+f.from,'warn'];
+  if(f.until&&f.until<y)return ['Ended '+f.until,'bad'];
+  return ['Showing'+(f.until?' until '+f.until:''),'ok'];
+}
+function vSlides(){
+  if(!slideTheme||!S.themes.some(function(t){return t.Theme===slideTheme;}))slideTheme=(S.themes[0]||{}).Theme;
+  var th=S.themeObjs.filter(function(t){return t.name===slideTheme;})[0]||{};
+  var fold=(S.folders||{})[slideTheme]||{linked:false,files:[]};
+  var h='<section class="panel"><div class="row" style="justify-content:space-between"><h2>Slides</h2><div class="row">'+
+    S.themes.map(function(t){return '<button class="tog'+(t.Theme===slideTheme?' on':'')+'" data-act="slideTheme" data-t="'+esc(t.Theme)+'">'+esc(t.Theme)+'</button>';}).join('')+'</div></div>'+
+    '<p class="muted small">Each slide shows for 12 seconds, in this order. Status is for '+esc(niceStamp(S.t))+'.</p></section>';
+
+  // Uploaded slides (the theme's Drive folder)
+  h+='<section class="panel"><div class="row" style="justify-content:space-between"><h2>Uploaded slides</h2>'+
+    (fold.url?'<a class="btn sm" href="'+esc(fold.url)+'" target="_blank" rel="noopener">Open folder in Drive</a>':'')+'</div>';
+  if(!fold.linked||fold.error){
+    h+=folderNote(slideTheme)+'</section>';
+  }else{
+    if(fold.shared===false)h+=folderNote(slideTheme);
+    h+='<p class="muted small">Files in <b>'+esc(fold.name)+'</b>. Anything added straight to that Drive folder shows up here and on the TVs within about a minute.</p>'+
+      '<div class="drop" id="drop"><div><b>Drop JPG, PNG or MP4 files here</b> or <label class="btn sm" for="upFiles" style="display:inline-flex">choose files</label>'+
+      '<input type="file" id="upFiles" multiple accept="image/jpeg,image/png,video/mp4" style="position:absolute;width:1px;height:1px;opacity:0"></div>'+
+      '<div class="muted small">1920x1080 looks best. Up to 45 MB each.</div>'+
+      '<div class="row"><label class="f" style="flex-direction:row;align-items:center;gap:6px">Show from<input type="date" id="upFrom" style="width:auto"></label>'+
+      '<label class="f" style="flex-direction:row;align-items:center;gap:6px">Show until<input type="date" id="upUntil" style="width:auto"></label>'+
+      '<span class="muted small">Optional, for these uploads</span></div><div id="upStatus" class="small"></div></div>';
+    h+=fold.files.length?fold.files.map(function(f,i){return fileRow(f,i,fold.files.length);}).join(''):'<p class="muted">No files in the folder yet.</p>';
+    h+='</section>';
+  }
+
+  return h;
+}
+function fileRow(f,i,n){
+  var st=fileStatus(f),id='f'+i;
+  return '<div class="slide"><div class="tvbox thumb"><img src="'+esc(f.thumb)+'" alt="" loading="lazy">'+(f.video?'<span class="vtag">Video'+(f.full?', full length':'')+'</span>':'')+'</div>'+
+    '<div style="display:flex;flex-direction:column;gap:10px;min-width:0">'+
+    '<div class="row" style="justify-content:space-between"><span class="chip '+st[1]+'">'+esc(st[0])+'</span><span class="muted small">#'+(i+1)+'</span></div>'+
+    '<div style="font-weight:600;overflow-wrap:anywhere">'+esc(f.title||f.name)+'</div><div class="muted small" style="overflow-wrap:anywhere">'+esc(f.name)+'</div>'+
+    '<div class="row"><label class="f" style="flex-direction:row;align-items:center;gap:6px">From<input type="date" id="'+id+'From" value="'+esc(f.from)+'" style="width:auto"></label>'+
+    '<label class="f" style="flex-direction:row;align-items:center;gap:6px">Until<input type="date" id="'+id+'Until" value="'+esc(f.until)+'" style="width:auto"></label>'+
+    '<button class="btn sm" data-act="fileDates" data-id="'+esc(f.id)+'" data-i="'+i+'">Save dates</button></div>'+
+    '<div class="row"><button class="btn sm" data-act="fileMove" data-id="'+esc(f.id)+'" data-dir="-1" aria-label="Move earlier"'+(i===0?' disabled':'')+'>↑</button>'+
+    '<button class="btn sm" data-act="fileMove" data-id="'+esc(f.id)+'" data-dir="1" aria-label="Move later"'+(i===n-1?' disabled':'')+'>↓</button>'+
+    (pendingDelete==='file:'+f.id?'<button class="btn sm danger" data-act="fileTrashGo" data-id="'+esc(f.id)+'">Confirm: move to trash</button>':'<button class="btn sm danger" data-act="fileTrashAsk" data-id="'+esc(f.id)+'">Delete</button>')+
+    '</div></div></div>';
+}
+
+/* Uploads one file at a time, so each lands in order and one bad file doesn't stop the rest. */
+function uploadFiles(files){
+  files=Array.prototype.slice.call(files||[]);
+  if(!files.length)return;
+  var ok=['image/jpeg','image/png','video/mp4'],from=val('upFrom'),until=val('upUntil'),done=0,failed=[];
+  var status=function(msg){var e=document.getElementById('upStatus');if(e)e.textContent=msg;};
+  function next(){
+    if(!files.length){
+      busy(false);
+      toast(done+' file'+(done===1?'':'s')+' uploaded'+(failed.length?', '+failed.length+' failed':''),!!failed.length);
+      if(failed.length)status(failed.join(' '));
+      load();return;
+    }
+    var f=files.shift();
+    if(ok.indexOf(f.type)<0){failed.push('"'+f.name+'" isn\'t a JPG, PNG or MP4.');next();return;}
+    if(f.size>45*1024*1024){failed.push('"'+f.name+'" is over 45 MB; put it straight into the Drive folder.');next();return;}
+    status('Uploading '+f.name+'…');busy(true);
+    var r=new FileReader();
+    r.onload=function(){
+      var b64=String(r.result).split(',')[1]||'';
+      google.script.run.withSuccessHandler(function(){done++;next();})
+        .withFailureHandler(function(e){failed.push((e&&e.message)||String(e));next();})
+        .uploadSlide(slideTheme,f.name,f.type,b64,from,until,TOKEN);
+    };
+    r.onerror=function(){failed.push('"'+f.name+'" couldn\'t be read.');next();};
+    r.readAsDataURL(f);
+  }
+  next();
+}
+
+/* ---------- Activity ---------- */
+function vActivity(){
+  return '<section class="panel"><h2>Activity</h2><p class="muted small">Every change made through this panel, newest first.</p><div class="tbl"><table><thead><tr><th>When</th><th>Who</th><th>What</th><th>Details</th></tr></thead><tbody>'+
+    S.activity.map(function(a){return '<tr><td class="num">'+esc(a.Time)+'</td><td>'+esc(a.User)+'</td><td>'+esc(a.Action)+'</td><td>'+esc(a.Details)+'</td></tr>';}).join('')+'</tbody></table></div></section>';
+}
+
+/* ---------- Pairing a TV ---------- */
+var pairForm=null;
+function vPairForm(){
+  var f=pairForm,screenUrl=S.url+'?screen';
+  var devOpts=S.allDevices.map(function(d){var full=S.devices.filter(function(x){return x.id===d.id;})[0]||{};return '<option value="'+esc(d.id)+'"'+(f.target===d.id?' selected':'')+'>'+esc(d.name)+(full.pairedAt?' (replaces its current screen)':'')+'</option>';}).join('');
+  return '<section class="panel" style="background:var(--sunk)"><h2>Pair a TV</h2>'+
+    '<ol class="small" style="margin:0;padding-left:20px"><li>On the TV, open the screen link below. A 6-character code appears.</li><li>Type the code here and pick which TV it is.</li></ol>'+
+    '<div class="row"><input type="text" id="screenLink" readonly value="'+esc(screenUrl)+'" style="flex:1;min-width:0"><button class="btn sm" data-act="copyScreen">Copy screen link</button></div>'+
+    '<div class="fgrid"><label class="f">Code on the TV<input type="text" id="pairCode" value="'+esc(f.code||'')+'" maxlength="7" autocomplete="off" style="font-size:22px;letter-spacing:.12em;text-transform:uppercase" placeholder="K7Q-4MD"></label>'+
+    '<label class="f">Which TV is it?<select id="pairTarget" data-f="pair.target"><option value="__new"'+(f.target==='__new'?' selected':'')+'>A new TV…</option>'+devOpts+'</select></label></div>'+
+    (f.target==='__new'?'<div class="fgrid"><label class="f">Name<input type="text" id="pairName" value="'+esc(f.name||'')+'" placeholder="Room 104"></label>'+
+      '<label class="f">Kind of screen<select id="pairProfile">'+opts(['Signage','Classroom','Green Room'],f.profile||'Signage')+'</select></label>'+
+      '<label class="f">Theme<select id="pairTheme">'+opts(S.allThemes,f.theme||S.allThemes[0])+'</select></label></div>':'')+
+    '<div class="row"><button class="btn pri" data-act="pairGo">Pair</button><button class="btn" data-act="pairClose">Cancel</button></div></section>';
+}
+
+/* ---------- Setup, sign-in, invites ---------- */
+function gate(title,body){return '<section class="panel gate"><h2>'+title+'</h2>'+body+'</section>';}
+function vSetup(){
+  return gate('Set up '+(S.church||'your church'),
+    '<p>You\'re signed in to Google as <b>'+esc(S.me.email)+'</b>, the account that runs this app. Finishing setup makes you the <b>Owner</b>: you\'ll have full access and can invite everyone else.</p>'+
+    '<div class="fgrid"><label class="f">Church name<input type="text" id="suChurch" autocomplete="organization"></label>'+
+    '<label class="f">Your name<input type="text" id="suName" autocomplete="name"></label></div>'+
+    '<div class="fgrid"><label class="f">Backup password<input type="password" id="suPw" autocomplete="new-password"></label>'+
+    '<label class="f">Type it again<input type="password" id="suPw2" autocomplete="new-password"></label></div>'+
+    '<p class="muted small">You normally won\'t need the password: when you\'re signed in to this Google account the app knows it\'s you. It\'s for signing in from a browser that isn\'t. At least 8 characters.</p>'+
+    '<div class="row"><button class="btn pri" data-act="setupGo">Finish setup</button></div>');
+}
+function vSignIn(){
+  return gate('Sign in'+(S.church?' to '+esc(S.church):''),
+    '<form id="signInForm" class="fgrid" style="grid-template-columns:1fr" onsubmit="event.preventDefault();ACT.signInGo();">'+
+    '<label class="f">Email<input type="text" id="siEmail" autocomplete="username" inputmode="email"></label>'+
+    '<label class="f">Password<input type="password" id="siPw" autocomplete="current-password"></label>'+
+    '<div class="row"><button class="btn pri" type="submit">Sign in</button></div></form>'+
+    '<p class="muted small">Forgot your password? Ask an Admin for a new invite link; it lets you pick a new one. New here? You need an invite link from your church\'s Admin.</p>');
+}
+function vNotReady(){
+  return gate('Not set up yet','<p>This app hasn\'t been set up. The person who deployed it needs to open it first, signed in to that same Google account.</p>');
+}
+function vInvite(){
+  if(!INV)return gate('Checking your invite…','');
+  if(!INV.valid)return gate('This invite link doesn\'t work',
+    '<p>'+(INV.expired?'It has expired.':'It was already used, or a newer link replaced it.')+' Ask the person who invited you for a new link.</p>'+
+    '<div class="row"><button class="btn" data-act="leaveInvite">Go to sign in</button></div>');
+  return gate('Welcome'+(INV.church?' to '+esc(INV.church):''),
+    '<p>You\'ve been invited as <b>'+esc(INV.role)+'</b> with the email <b>'+esc(INV.email)+'</b>. Pick a password to finish.</p>'+
+    '<div class="fgrid"><label class="f">Your name<input type="text" id="ivName" value="'+esc(INV.name||'')+'" autocomplete="name"></label></div>'+
+    '<div class="fgrid"><label class="f">Password<input type="password" id="ivPw" autocomplete="new-password"></label>'+
+    '<label class="f">Type it again<input type="password" id="ivPw2" autocomplete="new-password"></label></div>'+
+    '<p class="muted small">At least 8 characters. You\'ll sign in with your email and this password.</p>'+
+    '<div class="row"><button class="btn pri" data-act="inviteGo">Create my account</button></div>');
+}
+
+/* ---------- People ---------- */
+var ROLE_HELP=[
+  ['Owner','Everything, including adding Admins. One person: the account that runs the app.'],
+  ['Admin','Everything: screens, schedule, themes, slides, and adding or removing people.'],
+  ['Staff','Sees every TV, uploads and manages slides, starts and ends overrides, reads the activity log. Can\'t change themes, the schedule or people.'],
+  ['Limited','Edits only the themes and slides you pick, and sees only the TVs you pick. Good for a school or a renter.']];
+function statusChip(s){return '<span class="chip '+(s==='Active'?'ok':s==='Invited'?'warn':'')+'">'+esc(s||'?')+'</span>';}
+function vPeople(){
+  var h='<section class="panel"><div class="row" style="justify-content:space-between"><h2>People</h2><button class="btn pri" data-act="newUser">Invite someone</button></div>';
+  if(newLink){
+    h+='<div class="linkbox"><b>Send this link to '+esc(newLink.email)+'</b><p class="small muted" style="margin:0">It works once and expires in 7 days. Share it however you like: text, email or chat.</p>'+
+      '<div class="row"><input type="text" id="inviteLink" readonly value="'+esc(newLink.link)+'" style="flex:1;min-width:0"><button class="btn sm" data-act="copyLink">Copy</button><button class="btn sm" data-act="closeLink">Done</button></div></div>';
+  }
+  if(userEdit)h+=userForm();
+  h+='<div class="tbl"><table><thead><tr><th>Person</th><th>Role</th><th>Can reach</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead><tbody>';
+  h+='<tr><td><b>'+esc(S.owner.name)+'</b><br><span class="muted small">'+esc(S.owner.email)+'</span></td><td>Owner</td><td>Everything</td><td>'+statusChip('Active')+'</td><td class="muted small">Google account</td><td></td></tr>';
+  h+=S.users.map(function(u,i){
+    var scope=u.role==='Limited'?esc(u.themes.join(', ')||'No themes')+(u.devices.length?'<br><span class="muted small">TVs: '+esc(u.devices.join(', '))+'</span>':''):'Everything';
+    var del=pendingDelete==='user:'+u.email;
+    return '<tr class="'+(u.status==='Off'?'off':'')+'"><td><b>'+esc(u.name||'(no name yet)')+'</b><br><span class="muted small">'+esc(u.email)+'</span></td><td>'+esc(u.role)+'</td><td>'+scope+'</td><td>'+statusChip(u.status)+'</td>'+
+      '<td class="muted small">'+esc(u.lastSignIn||'Never')+'</td><td><div class="row" style="flex-wrap:nowrap">'+
+      '<button class="btn sm" data-act="editUser" data-i="'+i+'">Edit</button>'+
+      '<button class="btn sm" data-act="reinvite" data-e="'+esc(u.email)+'" title="Also resets a forgotten password">New link</button>'+
+      '<button class="btn sm" data-act="toggleUser" data-e="'+esc(u.email)+'" data-on="'+(u.status==='Off'?1:'')+'">'+(u.status==='Off'?'Turn on':'Turn off')+'</button>'+
+      (del?'<button class="btn sm danger" data-act="delUserGo" data-e="'+esc(u.email)+'">Confirm remove</button>':'<button class="btn sm danger" data-act="delUserAsk" data-e="'+esc(u.email)+'">Remove</button>')+
+      '</div></td></tr>';
+  }).join('');
+  h+='</tbody></table></div>'+(S.users.length?'':'<p class="muted">Nobody else yet. Use "Invite someone" to add staff, volunteers, a school or a renter.</p>')+'</section>';
+  h+='<section class="panel"><h2>What each role can do</h2><div class="roles">'+ROLE_HELP.map(function(r){return '<div><b>'+r[0]+'</b><p class="small" style="margin:4px 0 0">'+r[1]+'</p></div>';}).join('')+'</div></section>';
+  return h;
+}
+function checks(name,all,sel){
+  return '<div class="row">'+all.map(function(x){var id=name+'-'+x.replace(/\W/g,'_');
+    return '<label class="tog'+(sel.indexOf(x)>=0?' on':'')+'" for="'+id+'" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="'+id+'" data-chk="'+name+'" value="'+esc(x)+'"'+(sel.indexOf(x)>=0?' checked':'')+'>'+esc(x)+'</label>';}).join('')+'</div>';
+}
+function userForm(){
+  var u=userEdit,isNew=!u.existing;
+  return '<div class="panel" style="background:var(--sunk)"><h3>'+(isNew?'Invite someone':'Change access for '+esc(u.email))+'</h3><div class="fgrid">'+
+    '<label class="f">Email<input type="text" id="ueEmail" value="'+esc(u.email||'')+'"'+(isNew?'':' readonly')+' inputmode="email"></label>'+
+    '<label class="f">Name<input type="text" id="ueName" value="'+esc(u.name||'')+'"></label>'+
+    '<label class="f">Role<select id="ueRole" data-f="ue.role">'+opts(S.roles,u.role)+'</select></label></div>'+
+    '<p class="small muted" style="margin:0">'+esc((ROLE_HELP.filter(function(r){return r[0]===u.role;})[0]||['',''])[1])+'</p>'+
+    (u.role==='Limited'?'<div><div class="small" style="font-weight:600;margin-bottom:6px">Themes they can edit (and their slides)</div>'+checks('ueThemes',S.allThemes,u.themes||[])+'</div>'+
+      '<div><div class="small" style="font-weight:600;margin-bottom:6px">TVs they can see (optional)</div>'+checks('ueDevices',S.allDevices.map(function(d){return d.name;}),u.devices||[])+'</div>':'')+
+    '<div class="row"><button class="btn pri" data-act="saveUserGo">'+(isNew?'Create invite link':'Save')+'</button><button class="btn" data-act="cancelUser">Cancel</button></div></div>';
+}
+function checked(name){return Array.prototype.slice.call(document.querySelectorAll('input[data-chk="'+name+'"]:checked')).map(function(x){return x.value;});}
+
+/* ---------- Launchers (home screen layouts) ---------- */
+var launchForm=null, lnDelete=false;
+var BUILTIN_HELP={watchlive:'Shows only while the service is live',
+  'return':'Signage TVs only: back to the slides',announcements:'Plays the slides full screen',dashboard:'Green Room TVs only',
+  mirror:'Cast a phone or laptop to this TV',hdmi:'Switches to the HDMI input, where the TV has one',youtube:'Opens YouTube',
+  browser:'Opens the web browser',store:'Opens the app store',allapps:'Every app on the TV',settings:'The TV\'s settings'};
+function lnBlank(){return {original:'',name:'',tiles:[{type:'watchlive',value:'',label:'Watch Live'},{type:'announcements',value:'',label:'Announcements'},{type:'allapps',value:'',label:'All Apps'}],idleMinutes:0,notes:'',devices:[]};}
+function lnLoad(l){return JSON.parse(JSON.stringify({original:l.name,name:l.name,tiles:l.tiles,idleMinutes:l.idleMinutes,notes:l.notes,devices:l.devices}));}
+/* Keeps what was typed when the page redraws after a tile change. */
+function lnCapture(){
+  if(!launchForm)return;
+  var n=document.getElementById('lnName');if(n)launchForm.name=n.value;
+  var i=document.getElementById('lnIdle');if(i)launchForm.idleMinutes=+i.value||0;
+  var t=document.getElementById('lnNotes');if(t)launchForm.notes=t.value;
+  if(document.querySelector('input[data-chk="lnDev"]'))launchForm.devices=checked('lnDev');
+}
+function tileKind(t){return t.type==='app'?'App: '+t.value:t.type==='web'?'Website: '+t.value:(BUILTIN_HELP[t.type]||'');}
+function vLaunchers(){
+  if(!launchForm)launchForm=S.launchers.length?lnLoad(S.launchers[0]):lnBlank();
+  var f=launchForm;
+  var h='<section class="panel"><div class="row" style="justify-content:space-between"><h2>Launchers</h2><button class="btn pri" data-act="lnNew">+ New layout</button></div>'+
+    '<p class="muted small">A launcher is the home screen people see when they leave the slides, or all the time on a classroom TV. Pick its tiles here, then choose which TVs use it. TVs leave out tiles that don\'t apply to them, such as Return to Signage on a classroom TV or Watch Live when nothing is live.</p>'+
+    '<div class="row">'+S.launchers.map(function(l){return '<button class="tog'+(l.name===f.original?' on':'')+'" data-act="lnPick" data-n="'+esc(l.name)+'">'+esc(l.name)+' <span class="muted small">('+l.devices.length+' TV'+(l.devices.length===1?'':'s')+')</span></button>';}).join('')+
+    (f.original?'':'<button class="tog on">New layout</button>')+'</div></section>';
+  var have={};f.tiles.forEach(function(t){have[t.type]=1;});
+  var builtinOpts=Object.keys(S.builtinTiles).filter(function(k){return !have[k];}).map(function(k){return '<option value="'+k+'">'+esc(S.builtinTiles[k])+'</option>';}).join('');
+  var appOpts=S.reportedApps.map(function(a){return '<option value="'+esc(a.pkg)+'|'+esc(a.label)+'">'+esc(a.label)+'</option>';}).join('');
+  var tilesHtml=f.tiles.map(function(t,i){
+    return '<div class="lnTile"><div style="min-width:0"><b>'+esc(t.label)+'</b><div class="muted small" style="overflow-wrap:anywhere">'+esc(tileKind(t))+'</div></div>'+
+      '<div class="row" style="flex-wrap:nowrap"><button class="btn sm" data-act="lnMove" data-i="'+i+'" data-d="-1" aria-label="Move earlier"'+(i===0?' disabled':'')+'>↑</button>'+
+      '<button class="btn sm" data-act="lnMove" data-i="'+i+'" data-d="1" aria-label="Move later"'+(i===f.tiles.length-1?' disabled':'')+'>↓</button>'+
+      '<button class="btn sm danger" data-act="lnRemove" data-i="'+i+'" aria-label="Remove">Remove</button></div></div>';
+  }).join('')||'<p class="muted">No tiles yet.</p>';
+  h+='<section class="panel"><div class="twocol"><div style="display:flex;flex-direction:column;gap:14px;min-width:0">'+
+    '<div class="fgrid"><label class="f">Layout name<input type="text" id="lnName" value="'+esc(f.name)+'" placeholder="Classroom"></label>'+
+    '<label class="f">Go back after (minutes idle, signage TVs)<input type="text" id="lnIdle" inputmode="numeric" value="'+(f.idleMinutes||'')+'" placeholder="10"></label></div>'+
+    '<div><div class="small" style="font-weight:600;margin-bottom:6px">Tiles, in order (the first one has focus)</div><div class="lnTiles">'+tilesHtml+'</div></div>'+
+    '<div class="panel" style="background:var(--sunk);gap:10px"><b class="small">Add a tile</b>'+
+      (builtinOpts?'<div class="row"><select id="lnBuiltin" style="width:auto;flex:1">'+builtinOpts+'</select><button class="btn sm" data-act="lnAddBuiltin">Add</button></div>':'')+
+      '<div class="row"><select id="lnApp" style="width:auto;flex:1"><option value="">An app'+(S.reportedApps.length?' from your TVs…':' (none reported yet)…')+'</option>'+appOpts+'</select><button class="btn sm" data-act="lnAddApp">Add</button></div>'+
+      '<div class="row"><input type="text" id="lnPkgLabel" placeholder="App name" style="flex:1;min-width:120px"><input type="text" id="lnPkg" placeholder="Package, like us.zoom.videomeetings" style="flex:2;min-width:160px"><button class="btn sm" data-act="lnAddPkg">Add</button></div>'+
+      '<div class="row"><input type="text" id="lnWebLabel" placeholder="Website name" style="flex:1;min-width:120px"><input type="text" id="lnWebUrl" placeholder="https://graceview.org" style="flex:2;min-width:160px"><button class="btn sm" data-act="lnAddWeb">Add</button></div>'+
+      '<p class="muted small" style="margin:0">Paired TVs report their installed apps every hour, so the app list fills in once a TV has checked in.</p></div>'+
+    '<div><div class="small" style="font-weight:600;margin-bottom:6px">TVs that use this layout</div>'+checks('lnDev',S.deviceList.map(function(d){return d.id;}),f.devices).replace(/>([A-Z0-9]+)<\/label>/g,function(m,id){var d=S.deviceList.filter(function(x){return x.id===id;})[0];return '>'+esc(d?d.name+(d.launcher&&d.launcher!==f.original?' (now: '+d.launcher+')':''):id)+'</label>';})+'</div>'+
+    '<label class="f">Notes<input type="text" id="lnNotes" value="'+esc(f.notes||'')+'" placeholder="Who it\'s for"></label>'+
+    '<div class="row"><button class="btn pri" data-act="lnSave">Save layout</button>'+
+      (f.original?(lnDelete?'<button class="btn danger" data-act="lnDelGo">Confirm delete</button>':'<button class="btn danger" data-act="lnDelAsk">Delete layout</button>'):'<button class="btn" data-act="lnCancel">Cancel</button>')+'</div>'+
+    '</div><div><div class="muted small" style="margin-bottom:6px">Preview (as on a classroom TV)</div><div class="tvbox" id="lnPrev">'+launcherPreview()+'</div>'+
+    '<p class="muted small">The real TV draws its own icons; this shows the order and names.</p></div></div></section>';
+  return h;
+}
+function launcherPreview(){
+  var th=(S.themeObjs||[])[0]||{name:'',display:S.church||'',main:'#333333',accent:'#555555',wayL:[],wayR:[]};
+  var scr={device:{id:'PREVIEW',name:'Preview',profile:'Classroom',wayfinding:false},mode:'Launcher',message:'',endMins:null,theme:th,
+    slides:(S.slidesByTheme||{})[th.name]||[],events:[],launcherTiles:launchForm.tiles.map(function(t){return t.label;})};
+  return renderScreen(scr,clk(),S.weather,{qr:false});
+}
+
+/* ---------- Devices ---------- */
+var devEdit=null;
+function devStatus(d){
+  if(!d.pairedAt)return '<span class="chip">No screen paired</span>';
+  if(d.online)return '<span class="chip ok">Online</span>';
+  return '<span class="chip warn">Offline</span><div class="muted small">'+(d.lastSeen?'Last seen '+esc(d.lastSeen):'Never checked in')+'</div>';
+}
+function vDevices(){
+  var h=(pairForm?vPairForm():'')+'<section class="panel"><div class="row" style="justify-content:space-between"><h2>Devices</h2>'+
+    (isAdmin()&&!pairForm?'<button class="btn pri" data-act="pairOpen">Pair a TV</button>':'')+'</div>'+
+    '<p class="muted small">Every TV, what it’s set to and whether it’s checking in. Online means it checked in within the last 3 minutes. IP address, model and app version come from the TV itself.</p>';
+  if(devEdit)h+=devForm();
+  h+='<div class="tbl"><table><thead><tr><th>TV</th><th>Kind</th><th>Theme</th><th>Showing now</th><th>Launcher</th><th>Status</th><th>IP address</th><th>Model / app</th><th></th></tr></thead><tbody>'+
+    S.devices.map(function(d){
+      var src=d.now.source==='Special Date'?'Special':d.now.source;
+      var link=S.url+'?tv='+encodeURIComponent(d.id);
+      var del=pendingDelete==='dev:'+d.id;
+      return '<tr><td><b>'+esc(d.name)+'</b>'+(d.location?'<div class="muted small">'+esc(d.location)+'</div>':'')+'</td>'+
+        '<td>'+esc(d.profile)+'</td><td>'+esc(d.defaultTheme)+'</td>'+
+        '<td><span class="chip '+esc(src)+'">'+esc(d.now.mode)+'</span><div class="muted small">'+esc(d.screen.theme.name)+' · '+esc(d.now.source)+'</div></td>'+
+        '<td>'+(d.launcher?esc(d.launcher):'<span class="muted">Built-in</span>')+'</td>'+
+        '<td>'+devStatus(d)+'</td>'+
+        '<td class="num">'+(d.ip?esc(d.ip):'<span class="muted">–</span>')+'</td>'+
+        '<td class="small">'+esc(d.hardware||'')+(d.version?'<div class="muted">v'+esc(d.version)+'</div>':'')+'</td>'+
+        '<td><div class="row" style="flex-wrap:nowrap">'+
+          (isAdmin()?'<button class="btn sm" data-act="devEditOpen" data-id="'+esc(d.id)+'">Edit</button>':'')+
+          '<a class="btn sm" href="'+esc(link)+'" target="_blank" rel="noopener">Preview</a>'+
+          (isAdmin()?(del?'<button class="btn sm danger" data-act="devRemoveGo" data-id="'+esc(d.id)+'">Confirm remove</button>':'<button class="btn sm danger" data-act="devRemoveAsk" data-id="'+esc(d.id)+'">Remove</button>'):'')+
+        '</div></td></tr>';
+    }).join('')+'</tbody></table></div>'+(S.devices.length?'':'<p class="muted">No TVs yet. Use Pair a TV to add one.</p>')+'</section>';
+  return h;
+}
+function devForm(){
+  var d=devEdit,launchOpts=['<option value="">Built-in tiles</option>'].concat((S.launcherNames||[]).map(function(n){return '<option'+(d.launcher===n?' selected':'')+'>'+esc(n)+'</option>';})).join('');
+  return '<div class="panel" style="background:var(--sunk)"><h3>Edit '+esc(d.originalName)+'</h3><div class="fgrid">'+
+    '<label class="f">Name<input type="text" id="deName" value="'+esc(d.name)+'"></label>'+
+    '<label class="f">Location<input type="text" id="deLocation" value="'+esc(d.location||'')+'"></label>'+
+    '<label class="f">Kind of screen<select id="deProfile">'+opts(['Signage','Classroom','Green Room'],d.profile)+'</select></label>'+
+    '<label class="f">Theme<select id="deTheme">'+opts(S.allThemes,d.theme)+'</select></label>'+
+    '<label class="f">When nothing is scheduled<select id="deMode">'+opts(S.modes,d.defaultMode||'Off')+'</select></label>'+
+    '<label class="f">Launcher<select id="deLauncher">'+launchOpts+'</select></label></div>'+
+    '<label class="small" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="deMute"'+(d.muteLive?' checked':'')+'> Play the scheduled live service without sound</label>'+
+    '<label class="small" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="deWay"'+(d.wayfinding?' checked':'')+'> Show wayfinding arrows (from its theme)</label>'+
+    '<p class="muted small" style="margin:0">Renaming also updates schedule rows, overrides, presets and Limited users that name this TV.</p>'+
+    '<div class="row"><button class="btn pri" data-act="devSave">Save</button><button class="btn" data-act="devCancel">Cancel</button></div></div>';
+}
+
+/* ---------- Green Room ---------- */
+var grForm=null, pcoEditing=false, pcoRemove=false;
+var GR_HELP={
+  'Planning Center Service Type ID':'The service type name (like Worship Service) or its ID number',
+  'Mic Assignment Source':'Where mic names come from',
+  'Plan Note Category':'Only for the Plan note source',
+  'ProPresenter Address':'IP and port from ProPresenter Settings > Network, like 192.168.1.50:50001',
+  'ProPresenter Timer Name':'The timer to show, like Sermon Timer',
+  'Avantis Address':'The console IP, like 192.168.1.60',
+  'Avantis MIDI Base Channel':'1 to 12; Graceview uses 12'};
+function grLoad(){var g=S.greenRoom||{settings:{},mics:[]};return {settings:JSON.parse(JSON.stringify(g.settings||{})),mics:JSON.parse(JSON.stringify(g.mics||[]))};}
+/* Keeps what was typed when the page redraws (adding or removing a mic). */
+function grCapture(){
+  if(!grForm||!document.getElementById('gr0'))return;
+  document.querySelectorAll('[data-gr]').forEach(function(el){grForm.settings[el.dataset.gr]=el.type==='checkbox'?(el.checked?'TRUE':'FALSE'):el.value;});
+  grForm.mics.forEach(function(m,i){['label','channel','notes','position'].forEach(function(f){var e=document.getElementById('mic'+i+f);if(e)m[f]=e.value;});});
+}
+function grStatusChip(x,label){
+  if(!x)return '<span class="chip">'+label+': not reported</span>';
+  return '<span class="chip '+(x.ok?'ok':'bad')+'">'+label+': '+esc(x.ok?'connected':'can’t connect')+'</span>'+(x.ok||!x.text?'':' <span class="small muted">'+esc(x.text)+'</span>');
+}
+function vGreenRoom(){
+  var g=S.greenRoom;if(!g)return '<section class="panel">Only the Owner and Admins can change the Green Room.</section>';
+  if(!grForm)grForm=grLoad();
+  var f=grForm,st=f.settings,pc=g.planningCenter||{saved:false};
+  var h='<section class="panel"><h2>Green Room</h2><p class="muted small">Settings for the worship team’s dashboard on Green Room TVs: Planning Center, ProPresenter, the Avantis console and the mic list. The TV connects to ProPresenter and the Avantis itself, so those only work when the TV is on the church network. Everything is read-only: the app never changes anything in ProPresenter or on the console.</p></section>';
+
+  // Planning Center login
+  h+='<section class="panel"><h3>Planning Center login</h3>';
+  if(pc.saved&&!pcoEditing){
+    h+='<div class="row"><span class="chip ok">Saved</span><span class="small">Application ID '+esc(pc.idHint)+' · saved by '+esc(pc.savedBy||'?')+' on '+esc(pc.savedAt||'?')+'</span></div>'+
+      '<p class="muted small" style="margin:0">Kept in the dashboard’s private storage (never in the Sheet or the activity log) and sent only to Green Room TVs, which store it encrypted.</p>'+
+      '<div class="row"><button class="btn sm" data-act="pcoEdit">Replace</button>'+
+      (pcoRemove?'<button class="btn sm danger" data-act="pcoRemoveGo">Confirm remove</button>':'<button class="btn sm danger" data-act="pcoRemoveAsk">Remove</button>')+'</div>';
+  }else{
+    h+='<p class="small" style="margin:0">Create a personal access token at <b>api.planningcenteronline.com</b> (Personal Access Tokens), ideally from a Planning Center user with view-only Services access. Paste its two parts here.</p>'+
+      '<div class="fgrid"><label class="f">Application ID<input type="text" id="pcoId" autocomplete="off" spellcheck="false"></label>'+
+      '<label class="f">Secret<input type="password" id="pcoSecret" autocomplete="new-password"></label></div>'+
+      '<div class="row"><button class="btn pri" data-act="pcoSave">Save login</button>'+(pc.saved?'<button class="btn" data-act="pcoCancel">Cancel</button>':'')+'</div>';
+  }
+  h+='</section>';
+
+  // Settings
+  var fields=Object.keys(GR_HELP).map(function(k,i){
+    if(k==='Mic Assignment Source'){
+      var o=(g.micSources||[]).map(function(v){return '<option value="'+esc(v)+'"'+((st[k]||'')===v?' selected':'')+'>'+esc(v||'None: show mic labels only')+'</option>';}).join('');
+      return '<label class="f">'+esc(k)+'<select id="gr'+i+'" data-gr="'+esc(k)+'">'+o+'</select><span class="muted small" style="font-weight:400">'+esc(GR_HELP[k])+'</span></label>';
+    }
+    return '<label class="f">'+esc(k)+'<input type="text" id="gr'+i+'" data-gr="'+esc(k)+'" value="'+esc(st[k]||'')+'"><span class="muted small" style="font-weight:400">'+esc(GR_HELP[k])+'</span></label>';
+  }).join('');
+  h+='<section class="panel"><h3>Settings</h3><div class="fgrid">'+fields+'</div>'+
+    '<label class="small" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="grHide" data-gr="Hide Declined People"'+((st['Hide Declined People']||'TRUE')!=='FALSE'?' checked':'')+'> Hide people who declined in Planning Center</label></section>';
+
+  // Mic map
+  h+='<section class="panel"><div class="row" style="justify-content:space-between"><h3>Mics</h3><button class="btn sm" data-act="micAdd">+ Add a mic</button></div>'+
+    '<p class="muted small" style="margin:0">Each mic’s label, its Avantis input channel (for LIVE/MUTED), and optionally the Planning Center position that sings or speaks on it.</p>'+
+    '<div class="tbl"><table><thead><tr><th>Label</th><th>Avantis input</th><th>Notes</th><th>Planning Center position</th><th></th></tr></thead><tbody>'+
+    f.mics.map(function(m,i){
+      return '<tr><td><input type="text" id="mic'+i+'label" value="'+esc(m.label)+'" style="min-width:80px"></td>'+
+        '<td><input type="text" id="mic'+i+'channel" value="'+esc(m.channel)+'" inputmode="numeric" style="width:80px"></td>'+
+        '<td><input type="text" id="mic'+i+'notes" value="'+esc(m.notes)+'"></td>'+
+        '<td><input type="text" id="mic'+i+'position" value="'+esc(m.position)+'"></td>'+
+        '<td><button class="btn sm danger" data-act="micRemove" data-i="'+i+'">Remove</button></td></tr>';
+    }).join('')+'</tbody></table></div>'+(f.mics.length?'':'<p class="muted">No mics yet.</p>')+
+    '<div class="row"><button class="btn pri" data-act="grSave">Save settings and mics</button><button class="btn" data-act="grReset">Undo changes</button></div></section>';
+
+  // Connection status from Green Room TVs
+  h+='<section class="panel"><h3>Connections</h3>'+
+    (g.tvs.length?g.tvs.map(function(t){
+      return '<div class="panel" style="background:var(--sunk);gap:8px"><b>'+esc(t.name)+'</b>'+
+        (t.status?'<div class="row">'+grStatusChip(t.status.planningCenter,'Planning Center')+'</div><div class="row">'+grStatusChip(t.status.proPresenter,'ProPresenter')+'</div><div class="row">'+grStatusChip(t.status.avantis,'Avantis')+'</div>'+
+          '<span class="muted small">Reported '+esc(t.status.at)+'</span>'
+          :'<span class="muted small">'+(t.paired?'Not reported yet. The TV reports while its Green Room dashboard is open.':'No screen paired with this TV yet.')+'</span>')+'</div>';
+    }).join(''):'<p class="muted">No TVs use the Green Room profile.</p>')+'</section>';
+  return h;
+}
+
+/* ---------- Account ---------- */
+function vAccount(){
+  return '<section class="panel"><h2>Your account</h2><p><b>'+esc(S.me.name)+'</b> · '+esc(S.me.email)+' · '+esc(S.me.role)+'</p>'+
+    (S.me.viaGoogle?'<p class="muted small">You\'re signed in through the Google account that runs this app.</p>':'')+
+    '<h3>Change password</h3><div class="fgrid">'+
+    (S.me.viaGoogle?'':'<label class="f">Current password<input type="password" id="pwCur" autocomplete="current-password"></label>')+
+    '<label class="f">New password<input type="password" id="pwNew" autocomplete="new-password"></label>'+
+    '<label class="f">Type it again<input type="password" id="pwNew2" autocomplete="new-password"></label></div>'+
+    '<div class="row"><button class="btn pri" data-act="pwGo">Change password</button>'+(S.me.viaGoogle?'':'<button class="btn" data-act="signOut">Sign out</button>')+'</div></section>';
+}
+
+/* ---------- events ---------- */
+function val(id){var e=document.getElementById(id);return e?e.value:'';}
+var ACT={
+  view:function(b,e){e.preventDefault();view=b.dataset.v;edit=null;pendingDelete=null;render();scrollTo(0,0);},
+  at:function(b){preview=b.dataset.at;load();},
+  atCustom:function(){var d=val('pvDate'),t=val('pvTime');if(!d||!t){toast('Pick a date and a time.',true);return;}preview=d+'T'+t;load();},
+  ovFor:function(b){ov=ovDefaults();ov.targets=[b.dataset.name];view='override';render();},
+  preset:function(b){var p=S.presets[+b.dataset.i];ov=ovDefaults();ov.targets=String(p.Devices).split(',').map(function(x){return x.trim();}).filter(String);ov.mode=p.Mode||'Message';ov.theme=p.Theme||ov.theme;ov.message=p.Message||'';ovConfirm=false;render();},
+  ovTarget:function(b){var t=b.dataset.t,i=ov.targets.indexOf(t);
+    if(i>=0)ov.targets.splice(i,1);else if(t==='ALL')ov.targets=['ALL'];else{ov.targets=ov.targets.filter(function(x){return x!=='ALL';});ov.targets.push(t);}
+    ovConfirm=false;render();},
+  ovAsk:function(){if(ov.mode==='Message'&&!ov.message.trim()){toast('Type the message to show.',true);return;}ovConfirm=true;render();},
+  ovCancel:function(){ovConfirm=false;render();},
+  ovGo:function(){call('startOverride',[{devices:ovDevices(),mode:ov.mode,theme:ov.theme,message:ov.mode==='Message'?ov.message:'',duration:ov.duration}],'Override started',function(){ovConfirm=false;});},
+  endOv:function(){call('endOverride',[],'Override ended');},
+  newW:function(){edit={kind:'weekly',r:{_row:0,Enabled:'TRUE',Day:'Sun',Start:'09:00',End:'10:00',Devices:'ALL SIGNAGE',Mode:'Signage',Theme:(S.themes[0]||{}).Theme,Note:''}};render();},
+  editW:function(b){edit={kind:'weekly',r:S.weekly[+b.dataset.i]};render();var f=document.getElementById('wDay');if(f)f.scrollIntoView({block:'center'});},
+  saveW:function(){call('saveWeekly',[{_row:edit.r._row,Enabled:!!val('wEnabled'),Day:val('wDay'),Start:val('wStart'),End:val('wEnd'),Devices:val('wDevices'),Mode:val('wMode'),Theme:val('wTheme'),Note:val('wNote')}],'Saved',function(){edit=null;});},
+  newS:function(){edit={kind:'special',r:{_row:0,Enabled:'TRUE',Start:'08:00',End:'13:00'}};render();},
+  editS:function(b){edit={kind:'special',r:S.special[+b.dataset.i]};render();},
+  saveS:function(){call('saveSpecial',[{_row:edit.r._row,Enabled:!!val('sEnabled'),Name:val('sName'),From:val('sFrom'),To:val('sTo'),Start:val('sStart'),End:val('sEnd'),Devices:val('sDevices'),Mode:val('sMode'),Theme:val('sTheme')}],'Saved',function(){edit=null;});},
+  cancelEdit:function(){edit=null;render();},
+  moveW:function(b){call('moveWeekly',[+b.dataset.row,+b.dataset.dir],'Moved');},
+  delAsk:function(b){pendingDelete=b.dataset.tab+':'+b.dataset.row;render();},
+  delGo:function(b){call('deleteRow',[b.dataset.tab,+b.dataset.row],'Deleted',function(){pendingDelete=null;edit=null;});},
+  pairOpen:function(){pairForm={target:'__new'};render();var c=document.getElementById('pairCode');if(c)c.focus();},
+  pairClose:function(){pairForm=null;render();},
+  pairGo:function(){
+    var tgt=val('pairTarget'),target=tgt==='__new'?{name:val('pairName'),profile:val('pairProfile'),theme:val('pairTheme')}:{deviceId:tgt};
+    call('approvePairing',[val('pairCode'),target],'',function(r){pairForm=null;toast('Paired with '+r.name+'. The TV switches over in a few seconds.');});
+  },
+  copyScreen:function(){var i=document.getElementById('screenLink');if(!i)return;try{navigator.clipboard.writeText(i.value).then(function(){toast('Screen link copied');},function(){i.select();toast('Press Ctrl+C to copy');});}catch(e){i.select();toast('Press Ctrl+C to copy');}},
+  unpairAsk:function(b){pendingDelete='tv:'+b.dataset.id;render();},
+  unpairGo:function(b){call('unpairDevice',[b.dataset.id],'Unpaired. That screen is back to showing a code.',function(){pendingDelete=null;});},
+  addTheme:function(){addingTheme=true;render();},
+  addThemeCancel:function(){addingTheme=false;render();},
+  addThemeGo:function(){
+    var name=val('ntName');
+    call('addTheme',[{name:name,display:val('ntDisplay'),main:val('ntMain'),accent:val('ntAccent')}],'Theme added with its own slides folder',
+      function(){addingTheme=false;themeForm={Theme:name};});
+  },
+  mkFolder:function(b){call('createThemeFolder',[b.dataset.t],'Slides folder created and shared by link');},
+  shareFolder:function(b){call('shareThemeFolder',[b.dataset.t],'Folder is now viewable by link');},
+  themeFallback:function(b){call('setFallbackTheme',[b.dataset.t],b.dataset.t+' is now the fallback theme');},
+  themeDelAsk:function(b){
+    var t=b.dataset.t;themeDel={theme:t,usage:null};render();
+    busy(true);google.script.run.withSuccessHandler(function(u){busy(false);if(themeDel&&themeDel.theme===t){themeDel.usage=u;render();}})
+      .withFailureHandler(function(e){themeDel=null;fail(e);}).themeUsage(t,TOKEN);
+  },
+  themeDelCancel:function(){themeDel=null;render();},
+  themeDelGo:function(b){
+    var t=b.dataset.t;
+    call('deleteTheme',[t],'',function(r){themeDel=null;themeForm=null;toast('Deleted '+t+(r&&r.devices?'. '+r.devices+' TV'+(r.devices===1?'':'s')+' now use '+r.fallback+'.':'.'));});
+  },
+  pickTheme:function(b){themeDel=null;themeForm=JSON.parse(JSON.stringify(S.themes.filter(function(t){return t.Theme===b.dataset.t;})[0]));render();},
+  resetTheme:function(){themeForm=null;render();},
+  suggestText:function(b){
+    var bg=themeForm[b.dataset.bg];if(!isHex(bg)){toast('Fix the background color first.',true);return;}
+    var light='#FFFFFF',dark='#111111';
+    themeForm[b.dataset.tx]=contrast(bg,light)>=contrast(bg,dark)?light:dark;
+    render();toast('Text color set to '+(themeForm[b.dataset.tx]===light?'white':'near-black')+'. Save to keep it.');
+  },
+  saveTheme:function(){call('saveTheme',[themeForm],'Theme saved',function(){themeForm=JSON.parse(JSON.stringify(themeForm));});},
+  slideTheme:function(b){slideTheme=b.dataset.t;pendingDelete=null;render();},
+  fileMove:function(b){call('moveSlideFile',[slideTheme,b.dataset.id,+b.dataset.dir],'Reordered');},
+  fileDates:function(b){var id='f'+b.dataset.i;call('setSlideFileDates',[slideTheme,b.dataset.id,val(id+'From'),val(id+'Until')],'Dates saved');},
+  fileTrashAsk:function(b){pendingDelete='file:'+b.dataset.id;render();},
+  fileTrashGo:function(b){call('trashSlideFile',[slideTheme,b.dataset.id],'Moved to Drive trash',function(){pendingDelete=null;});},
+
+  /* setup and sign-in (these don't send a token) */
+  setupGo:function(){
+    if(val('suPw')!==val('suPw2')){toast('The two passwords don\'t match.',true);return;}
+    busy(true);google.script.run.withSuccessHandler(function(){busy(false);toast('You\'re set up as the Owner.');load();}).withFailureHandler(fail)
+      .setupChurch({church:val('suChurch'),name:val('suName'),password:val('suPw')});
+  },
+  signInGo:function(){
+    busy(true);google.script.run.withSuccessHandler(function(t){setToken(t);busy(false);load();}).withFailureHandler(fail).signIn(val('siEmail'),val('siPw'));
+  },
+  inviteGo:function(){
+    if(val('ivPw')!==val('ivPw2')){toast('The two passwords don\'t match.',true);return;}
+    busy(true);google.script.run.withSuccessHandler(function(t){setToken(t);INVITE='';busy(false);toast('Welcome! Your account is ready.');load();}).withFailureHandler(fail)
+      .acceptInvite(INVITE,val('ivName'),val('ivPw'));
+  },
+  leaveInvite:function(){INVITE='';load();},
+  signOut:function(){var t=TOKEN;setToken('');google.script.run.signOut(t);view='now';load();},
+  pwGo:function(){
+    if(val('pwNew')!==val('pwNew2')){toast('The two new passwords don\'t match.',true);return;}
+    call('changePassword',[val('pwCur'),val('pwNew')],'Password changed');
+  },
+
+  /* people */
+  newUser:function(){userEdit={role:'Staff',themes:[],devices:[]};newLink=null;render();},
+  editUser:function(b){var u=S.users[+b.dataset.i];userEdit={existing:true,email:u.email,name:u.name,role:u.role,themes:u.themes.slice(),devices:u.devices.slice()};newLink=null;render();},
+  cancelUser:function(){userEdit=null;render();},
+  saveUserGo:function(){
+    var u={email:val('ueEmail'),name:val('ueName'),role:val('ueRole'),themes:checked('ueThemes'),devices:checked('ueDevices')};
+    var wasNew=!userEdit.existing;
+    call('saveUser',[u],wasNew?'':'Saved',function(res){userEdit=null;if(res&&res.link){newLink={email:u.email,link:res.link};toast('Invite link ready');}});
+  },
+  reinvite:function(b){var e=b.dataset.e;call('reinviteUser',[e],'',function(res){newLink={email:e,link:res.link};toast('New link ready. Older links for '+e+' no longer work.');});},
+  toggleUser:function(b){call('setUserActive',[b.dataset.e,!!b.dataset.on],b.dataset.on?'Turned on':'Turned off. They\'re signed out.');},
+  delUserAsk:function(b){pendingDelete='user:'+b.dataset.e;render();},
+  delUserGo:function(b){call('removeUser',[b.dataset.e],'Removed',function(){pendingDelete=null;});},
+  copyLink:function(){
+    var i=document.getElementById('inviteLink');if(!i)return;
+    var done=function(){toast('Link copied');};
+    try{navigator.clipboard.writeText(i.value).then(done,function(){i.select();toast('Press Ctrl+C to copy');});}catch(e){i.select();toast('Press Ctrl+C to copy');}
+  },
+  closeLink:function(){newLink=null;render();},
+
+  /* devices */
+  devEditOpen:function(b){var d=S.devices.filter(function(x){return x.id===b.dataset.id;})[0];if(!d)return;
+    devEdit={id:d.id,originalName:d.name,name:d.name,location:d.location||'',profile:d.profile,theme:d.defaultTheme,defaultMode:d.defaultMode,launcher:d.launcher,muteLive:d.muteLive,wayfinding:d.wayfinding};pendingDelete=null;render();},
+  devCancel:function(){devEdit=null;render();},
+  devSave:function(){
+    var v={id:devEdit.id,name:val('deName'),location:val('deLocation'),profile:val('deProfile'),theme:val('deTheme'),defaultMode:val('deMode'),launcher:val('deLauncher'),
+      muteLive:!!(document.getElementById('deMute')||{}).checked,wayfinding:!!(document.getElementById('deWay')||{}).checked};
+    call('saveDevice',[v],'',function(r){devEdit=null;toast(r&&r.renamed?'Saved. Also updated '+r.renamed+' rows that named this TV.':'Saved');});
+  },
+  devRemoveAsk:function(b){pendingDelete='dev:'+b.dataset.id;render();},
+  devRemoveGo:function(b){call('removeDevice',[b.dataset.id],'TV removed',function(){pendingDelete=null;});},
+
+  /* green room */
+  pcoEdit:function(){grCapture();pcoEditing=true;render();},
+  pcoCancel:function(){pcoEditing=false;render();},
+  pcoSave:function(){var id=val('pcoId'),sec=val('pcoSecret');grCapture();call('savePlanningCenter',[id,sec],'Planning Center login saved',function(){pcoEditing=false;});},
+  pcoRemoveAsk:function(){grCapture();pcoRemove=true;render();},
+  pcoRemoveGo:function(){call('clearPlanningCenter',[],'Planning Center login removed',function(){pcoRemove=false;});},
+  micAdd:function(){grCapture();grForm.mics.push({label:'',channel:'',notes:'',position:''});render();},
+  micRemove:function(b){grCapture();grForm.mics.splice(+b.dataset.i,1);render();},
+  grReset:function(){grForm=null;render();},
+  grSave:function(){grCapture();call('saveGreenRoom',[{settings:grForm.settings,mics:grForm.mics}],'Green Room saved',function(){grForm=null;});},
+
+  /* launchers */
+  lnPick:function(b){var l=S.launchers.filter(function(x){return x.name===b.dataset.n;})[0];if(l){launchForm=lnLoad(l);lnDelete=false;render();}},
+  lnNew:function(){launchForm=lnBlank();lnDelete=false;render();},
+  lnCancel:function(){launchForm=null;render();},
+  lnMove:function(b){lnCapture();var i=+b.dataset.i,j=i+(+b.dataset.d),t=launchForm.tiles;if(j<0||j>=t.length)return;var x=t[i];t[i]=t[j];t[j]=x;render();},
+  lnRemove:function(b){lnCapture();launchForm.tiles.splice(+b.dataset.i,1);render();},
+  lnAddBuiltin:function(){lnCapture();var k=val('lnBuiltin');if(!k)return;launchForm.tiles.push({type:k,value:'',label:S.builtinTiles[k]});render();},
+  lnAddApp:function(){
+    lnCapture();var v=val('lnApp');if(!v){toast('Pick an app first.',true);return;}
+    var parts=v.split('|');launchForm.tiles.push({type:'app',value:parts[0],label:parts.slice(1).join('|')||parts[0]});render();
+  },
+  lnAddPkg:function(){
+    lnCapture();var pkg=val('lnPkg').trim(),label=val('lnPkgLabel').trim();
+    if(!/^[A-Za-z]\w*(\.\w+)+$/.test(pkg)){toast("That does not look like a package name. Package names look like com.example.app.",true);return;}
+    launchForm.tiles.push({type:'app',value:pkg,label:label||pkg});render();
+  },
+  lnAddWeb:function(){
+    lnCapture();var url=val('lnWebUrl').trim(),label=val('lnWebLabel').trim();
+    if(!/^https:\/\//i.test(url)){toast('Website tiles need a link that starts with https://',true);return;}
+    launchForm.tiles.push({type:'web',value:url,label:label||'Website'});render();
+  },
+  lnSave:function(){
+    lnCapture();var f=launchForm;
+    call('saveLauncher',[{original:f.original,name:f.name,tiles:f.tiles,idleMinutes:f.idleMinutes,notes:f.notes,devices:f.devices}],'Layout saved',
+      function(){launchForm=null;var n=f.name;setTimeout(function(){var l=(S.launchers||[]).filter(function(x){return x.name===n;})[0];if(l){launchForm=lnLoad(l);render();}},0);});
+  },
+  lnDelAsk:function(){lnCapture();lnDelete=true;render();},
+  lnDelGo:function(){call('deleteLauncher',[launchForm.original],'Layout deleted',function(){launchForm=null;lnDelete=false;});}
+};
+document.addEventListener('change',function(e){if(e.target&&e.target.id==='upFiles'){uploadFiles(e.target.files);e.target.value='';}});
+['dragenter','dragover'].forEach(function(ev){document.addEventListener(ev,function(e){var d=e.target.closest&&e.target.closest('#drop');if(d){e.preventDefault();d.classList.add('over');}});});
+['dragleave','drop'].forEach(function(ev){document.addEventListener(ev,function(e){var d=e.target.closest&&e.target.closest('#drop');if(d){e.preventDefault();d.classList.remove('over');if(ev==='drop')uploadFiles(e.dataTransfer.files);}});});
+document.addEventListener('click',function(e){var b=e.target.closest('[data-act]');if(!b||b.disabled||!S)return;ACT[b.dataset.act](b,e);});
+function onField(e){
+  var el=e.target.closest('[data-f]');if(!el||!S)return;var k=el.dataset.f;
+  if(k==='schedFilter'){schedFilter=el.value;render();return;}
+  if(k==='pair.target'){pairForm={code:val('pairCode'),target:el.value,name:val('pairName'),profile:val('pairProfile'),theme:val('pairTheme')};render();return;}
+  if(k==='ue.role'){userEdit.email=val('ueEmail');userEdit.name=val('ueName');userEdit.role=el.value;render();return;}
+  if(k.indexOf('ov.')===0){ov[k.slice(3)]=el.value;ovConfirm=false;
+    if(k==='ov.message'&&e.type==='input'){var p=document.getElementById('ovPrev');if(p){p.innerHTML=ovPreview();fitScreens(p);}}
+    else if(e.type==='change')render();return;}
+  if(k.indexOf('th.')===0){var f=k.slice(3);themeForm[f]=el.value;
+    var inRow=el.parentNode&&el.parentNode.classList.contains('colorrow');
+    if(inRow&&el.type==='color'){themeForm[f]=el.value.toUpperCase();var tx=el.parentNode.querySelector('input[type=text]');if(tx)tx.value=themeForm[f];}
+    if(inRow&&el.type==='text'&&isHex(el.value)){var c=el.parentNode.querySelector('input[type=color]');if(c)c.value=el.value;}
+    refreshThemePreview();}
+}
+document.addEventListener('input',onField);
+document.addEventListener('change',function(e){var c=e.target;if(c&&c.dataset&&c.dataset.chk&&c.parentNode)c.parentNode.classList.toggle('on',c.checked);});
+document.addEventListener('change',onField);
+addEventListener('resize',function(){fitScreens(document);});
+setInterval(function(){if(S&&S.t&&!S.t.preview&&!edit&&!ovConfirm&&!pairForm&&view==='now')load();},60000);
+if(INVITE){S={};render();google.script.run.withSuccessHandler(function(i){INV=i;render();}).withFailureHandler(fail).inviteInfo(INVITE);}
+else load();
+</script>
+</body>
+</html>
