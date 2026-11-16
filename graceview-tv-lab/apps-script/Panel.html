@@ -372,13 +372,38 @@ var addingTheme=false, themeDel=null;
 /* Fallback status, "make fallback" and delete (with what it would change) for Owner and Admins. */
 function themeAdminBox(theme){
   if(!isAdmin())return '';
-  return themeRenameBox(theme)+themeFallbackBox(theme);
+  return themeDuplicateBox(theme)+themeFallbackBox(theme);
 }
-/* The theme's own name (what TVs, schedule rows and people refer to). "Name on screens" is separate. */
-function themeRenameBox(theme){
-  return '<div class="row" style="align-items:flex-end"><label class="f" style="flex:1;min-width:160px">Theme name<input type="text" id="thRename" value="'+esc(theme)+'"></label>'+
-    '<button class="btn sm" data-act="themeRename" data-t="'+esc(theme)+'">Rename</button></div>'+
-    '<p class="muted small" style="margin:0">Renaming also updates the TVs, schedule rows, override, presets and people that use this theme.</p>';
+var themeDup=null;
+/* Duplicate: a new theme with everything copied, and a short form for name, colors and slides. */
+function themeDuplicateBox(theme){
+  if(!themeDup||themeDup.source!==theme)return '<div class="row"><button class="btn sm" data-act="dupOpen" data-t="'+esc(theme)+'">Duplicate…</button>'+
+    '<span class="muted small">Make an event theme from this one: same logo, arrows, QR, Wi-Fi and calendar, new colors.</span></div>';
+  var f=themeDup;
+  var color=function(id,label,v){return '<label class="f">'+label+'<span class="colorrow"><input type="color" id="'+id+'C" value="'+esc(v)+'" data-dup="'+id+'"><input type="text" id="'+id+'" value="'+esc(v)+'" maxlength="7" data-dup="'+id+'"></span></label>';};
+  var radio=function(v,label,help){return '<label class="small" style="display:flex;gap:8px;align-items:flex-start"><input type="radio" name="dupSlides" value="'+v+'"'+(f.slides===v?' checked':'')+'><span><b>'+label+'</b><br><span class="muted">'+help+'</span></span></label>';};
+  return '<div class="panel" style="background:var(--sunk)"><h3>Duplicate '+esc(theme)+'</h3>'+
+    '<div class="fgrid"><label class="f">New theme name<input type="text" id="dupName" value="'+esc(f.name)+'" placeholder="Easter"></label>'+
+    '<label class="f">Name on screens<input type="text" id="dupDisplay" value="'+esc(f.display)+'"></label></div>'+
+    '<div class="fgrid">'+color('dupMain','Main color',f.main)+color('dupMainText','Main text',f.mainText)+color('dupAccent','Accent color',f.accent)+color('dupAccentText','Accent text',f.accentText)+'</div>'+
+    '<div id="dupSwatch">'+dupSwatch()+'</div>'+
+    '<div style="display:flex;flex-direction:column;gap:8px">'+
+      radio('new','New empty slides folder','For slides made for this event')+
+      radio('copy','Copy the slides from '+esc(theme),'A new folder that starts with copies of its slides')+
+      radio('share','Use the same slides folder','Both themes always play the same files')+'</div>'+
+    '<p class="muted small" style="margin:0">Everything else is copied: logo, wayfinding arrows, QR link, Wi-Fi, calendar and hide list. You can change any of it after.</p>'+
+    '<div class="row"><button class="btn pri" data-act="dupGo">Create theme</button><button class="btn" data-act="dupCancel">Cancel</button></div></div>';
+}
+function dupSwatch(){
+  var f=themeDup;
+  var one=function(bg,tx,label){return isHex(bg)&&isHex(tx)?'<div class="swatch" style="background:'+bg+';color:'+tx+';flex:1"><span class="big">10:45 AM</span><span>'+label+'</span></div>':'';};
+  return '<div class="row" style="flex-wrap:nowrap">'+one(f.main,f.mainText,'Main')+one(f.accent,f.accentText,'Accent')+'</div>';
+}
+function dupCapture(){
+  if(!themeDup)return;
+  var g=function(id){var e=document.getElementById(id);return e?e.value:null;};
+  ['name','display'].forEach(function(k){var v=g('dup'+k.charAt(0).toUpperCase()+k.slice(1));if(v!==null)themeDup[k]=v;});
+  var r=document.querySelector('input[name="dupSlides"]:checked');if(r)themeDup.slides=r.value;
 }
 function themeFallbackBox(theme){
   if(theme===S.fallbackTheme)return '<div class="small"><span class="chip">Fallback theme</span> TVs use this theme when theirs is deleted or missing. To delete it, make another theme the fallback first.</div>';
@@ -891,14 +916,19 @@ var ACT={
       .withFailureHandler(function(e){themeDel=null;fail(e);}).themeUsage(t,TOKEN);
   },
   themeDelCancel:function(){themeDel=null;render();},
-  themeRename:function(b){
-    var from=b.dataset.t,to=val('thRename').trim();
-    if(!to||to===from){toast('Type a new name first.',true);return;}
-    call('renameTheme',[from,to],'',function(r){
-      themeDel=null;themeForm={Theme:r.name};if(slideTheme===from)slideTheme=r.name;
-      toast('Renamed to '+r.name+(r.updated?'. Updated '+r.updated+' rows that used it':'')+(r.folderRenamed?', and its slides folder':'')+'.');
-    });
+  dupOpen:function(b){
+    var t=S.themes.filter(function(x){return x.Theme===b.dataset.t;})[0];if(!t)return;
+    themeDup={source:t.Theme,name:'',display:t['Display Name']||t.Theme,main:t.Main||'#333333',accent:t.Accent||'#555555',
+      mainText:t['Main Text']||'#FFFFFF',accentText:t['Accent Text']||'#FFFFFF',slides:'new'};themeDel=null;render();
   },
+  dupCancel:function(){themeDup=null;render();},
+  dupGo:function(){
+    dupCapture();var f=themeDup;
+    if(!String(f.name||'').trim()){toast('Give the new theme a name.',true);return;}
+    call('duplicateTheme',[f.source,{name:f.name,display:f.display,main:f.main,accent:f.accent,mainText:f.mainText,accentText:f.accentText,slides:f.slides}],'',
+      function(r){themeDup=null;themeForm={Theme:r.name};toast('Created '+r.name+(r.slides==='copy'?' with '+r.copied+' slides copied':r.slides==='share'?', sharing the same slides':' with a new slides folder')+'.');});
+  },
+
   themeDelGo:function(b){
     var t=b.dataset.t;
     call('deleteTheme',[t],'',function(r){themeDel=null;themeForm=null;toast('Deleted '+t+(r&&r.devices?'. '+r.devices+' TV'+(r.devices===1?'':'s')+' now use '+r.fallback+'.':'.'));});
@@ -1030,6 +1060,15 @@ function onField(e){
     refreshThemePreview();}
 }
 document.addEventListener('input',onField);
+document.addEventListener('input',function(e){
+  var el=e.target;if(!el||!el.dataset||!el.dataset.dup||!themeDup)return;
+  var id=el.dataset.dup,key={dupMain:'main',dupAccent:'accent',dupMainText:'mainText',dupAccentText:'accentText'}[id];
+  var v=el.value;if(el.type==='color')v=v.toUpperCase();
+  if(!isHex(v))return;
+  themeDup[key]=v;
+  var other=document.getElementById(el.type==='color'?id:id+'C');if(other&&other!==el)other.value=el.type==='color'?v:v.toLowerCase();
+  var sw=document.getElementById('dupSwatch');if(sw)sw.innerHTML=dupSwatch();
+});
 document.addEventListener('change',function(e){var c=e.target;if(c&&c.dataset&&c.dataset.chk&&c.parentNode)c.parentNode.classList.toggle('on',c.checked);});
 document.addEventListener('change',onField);
 addEventListener('resize',function(){fitScreens(document);});

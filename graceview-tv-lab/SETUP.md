@@ -62,7 +62,7 @@ The same rules as the live system: **Override** beats **Special Dates**, which b
 
 - **Colors:** main and accent, each with a **text color**, a readability score and **Suggest text color**. Live previews show both bottom-bar layouts.
 - **+ Add a theme** makes the theme and its own shared slides folder in Drive.
-- **Rename** changes the theme's name and updates everything that uses it (TVs, schedule rows, the override, presets, Limited users, the fallback setting), plus its slides folder if it still has the name the app gave it. **Name on screens** is what viewers see and can differ.
+- **Duplicate…** makes an event theme from an existing one: logo, wayfinding, QR, Wi-Fi and calendar are copied, and you set the new name, name on screens and colors. Slides can start in a new empty folder, as copies of the original, or share the original folder.
 - **Fallback theme:** one theme (Church to start) is the fallback. A TV whose theme is missing shows it.
 - **Delete theme…** shows what will change first (TVs move to the fallback; schedule rows, the override and presets follow each TV's theme; Limited users lose it), then deletes on confirm. Its slides folder stays in Drive. The fallback can't be deleted.
 - **Calendar:** a ShelbyNext or other `webcal://` or `https://….ics` link, or a public Google Calendar ID (several with `;`). **Calendar Hide** drops events by title. Every theme starts with a US-holidays stand-in.

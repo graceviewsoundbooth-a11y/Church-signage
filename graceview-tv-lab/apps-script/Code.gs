@@ -1914,45 +1914,49 @@ function deleteTheme(theme, token) {
 }
 
 /**
- * Renames a theme and everything that refers to it by name: TVs, schedule rows, the override,
- * presets, Limited users and the fallback setting. The theme's Drive folder is renamed too when
- * it still has the name the app gave it ("<Theme> Slides").
+ * Makes a new theme from an existing one: everything is copied (logo, wayfinding, QR, Wi-Fi,
+ * calendar, hide list), with a new name, name on screens and colors. Slides:
+ *   'new'   a new empty shared folder (the default, for event slides)
+ *   'copy'  a new shared folder with copies of the original's slide files
+ *   'share' the same folder as the original (both themes play the same files)
  */
-function renameTheme(oldName, newName, token) {
+function duplicateTheme(sourceName, info, token) {
   return locked_(function () {
     const d = data_(); const me = me_(d, token);
     needAdmin_(me);
-    const row = themeRow_(d, oldName);
-    newName = String(newName || '').trim();
-    if (!newName) throw new Error('Give the theme a name.');
-    if (/[,;]/.test(newName)) throw new Error('Theme names can\'t contain commas or semicolons.');
-    if (newName === oldName) return { name: newName, updated: 0 };
-    if (d.themes.some(function (x) { return x.Theme !== oldName && x.Theme.toLowerCase() === newName.toLowerCase(); })) {
-      throw new Error('There\'s already a theme called ' + newName + '.');
+    const src = themeRow_(d, sourceName);
+    const name = String(info.name || '').trim();
+    if (!name) throw new Error('Give the new theme a name, like "Easter" or "VBS 2027".');
+    if (/[,;]/.test(name)) throw new Error('Theme names can\'t contain commas or semicolons.');
+    if (d.themes.some(function (x) { return x.Theme.toLowerCase() === name.toLowerCase(); })) throw new Error('There\'s already a theme called ' + name + '.');
+    const hex = function (v, fallback) { return /^#[0-9a-fA-F]{6}$/.test(v || '') ? String(v).toUpperCase() : fallback; };
+    const slides = ['new', 'copy', 'share'].indexOf(info.slides) >= 0 ? info.slides : 'new';
+    const vals = [name, String(info.display || '').trim() || src['Display Name'] || name,
+      hex(info.main, src.Main), hex(info.accent, src.Accent),
+      src['Logo URL'] || '', src['Wayfinding Left'] || '', src['Wayfinding Right'] || '', src['QR Label'] || '', src['QR Link'] || '',
+      src['Wi-Fi Name'] || '', src['Wi-Fi Password'] || '', src.Calendar || '', src['Calendar Hide'] || '',
+      slides === 'share' ? (src['Slides Folder'] || '') : '',
+      hex(info.mainText, src['Main Text'] || '#FFFFFF'), hex(info.accentText, src['Accent Text'] || '#FFFFFF')];
+    const row = appendRow_(sheet_('Themes'), vals.map(function (v) { return txt_(v); }));
+    let copied = 0;
+    if (slides !== 'share') {
+      ensureThemeFolder_({ Theme: name, 'Slides Folder': '', _row: row });
+      if (slides === 'copy') {
+        const fromId = folderId_(src['Slides Folder']);
+        const toId = folderId_(sheet_('Themes').getRange(row, 14).getDisplayValue());
+        if (fromId && toId) {
+          const to = DriveApp.getFolderById(toId);
+          const it = DriveApp.getFolderById(fromId).getFiles();
+          while (it.hasNext() && copied < 300) {
+            const f = it.next();
+            if (!MEDIA[f.getMimeType()]) continue;
+            f.makeCopy(f.getName(), to);
+            copied++;
+          }
+        }
+      }
     }
-    const r = themeRefs_(d, oldName);
-    let updated = 0;
-    const set = function (tab, rowNum, col, v) { sheet_(tab).getRange(rowNum, col).setValue(v); updated++; };
-    sheet_('Themes').getRange(row._row, 1).setValue(newName);
-    r.devices.forEach(function (v) { set('Devices', v._row, 6, newName); });
-    r.weekly.forEach(function (x) { set('Weekly', x._row, 7, newName); });
-    r.special.forEach(function (x) { set('Special Dates', x._row, 9, newName); });
-    r.override.forEach(function (x) { set('Override', x._row, 4, newName); });
-    r.presets.forEach(function (x) { set('Presets', x._row, 4, newName); });
-    r.users.forEach(function (u) {
-      set('Users', u._row, 4, split_(u.Themes, ',').map(function (x) { return x.trim() === oldName ? newName : x.trim(); }).join(', '));
-    });
-    if (String(settings_()['Fallback Theme'] || '').trim() === oldName) setSetting_('Fallback Theme', newName);
-    // The theme's slides folder, if it still has the name the app gave it.
-    let folderRenamed = false;
-    const id = folderId_(row['Slides Folder']);
-    if (id) {
-      try {
-        const f = DriveApp.getFolderById(id);
-        if (f.getName() === oldName + ' Slides') { f.setName(newName + ' Slides'); folderRenamed = true; }
-      } catch (err) { /* folder unreachable: leave it */ }
-    }
-    log_(me, 'Renamed theme', oldName + ' to ' + newName + ' (' + updated + ' rows updated' + (folderRenamed ? ', slides folder renamed' : '') + ')');
-    return { name: newName, updated: updated, folderRenamed: folderRenamed };
+    log_(me, 'Duplicated theme', sourceName + ' as ' + name + (slides === 'share' ? ' (same slides folder)' : slides === 'copy' ? ' (' + copied + ' slides copied)' : ' (new empty slides folder)'));
+    return { name: name, copied: copied, slides: slides };
   });
 }
