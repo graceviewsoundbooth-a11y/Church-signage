@@ -1879,7 +1879,16 @@ function themeUsage(theme, token) {
   needAdmin_(me);
   themeRow_(d, theme);
   const r = themeRefs_(d, theme);
+  const row = themeRow_(d, theme);
+  const fid = folderId_(row['Slides Folder']);
+  let folder = null;
+  if (fid) {
+    const sharedWith = d.themes.filter(function (x) { return x.Theme !== theme && folderId_(x['Slides Folder']) === fid; }).map(function (x) { return x.Theme; });
+    const f = folderFiles_(row, true);
+    folder = { name: f.name || '', files: (f.files || []).length, sharedWith: sharedWith, error: f.error || '' };
+  }
   return {
+    folder: folder,
     fallback: fallbackTheme_(d), isFallback: fallbackTheme_(d) === theme,
     devices: r.devices.map(function (v) { return v.Name; }),
     scheduleRows: r.weekly.length + r.special.length, override: r.override.length > 0,
@@ -1888,7 +1897,7 @@ function themeUsage(theme, token) {
   };
 }
 
-function deleteTheme(theme, token) {
+function deleteTheme(theme, token, trashFolder) {
   return locked_(function () {
     const d = data_(); const me = me_(d, token);
     needAdmin_(me);
@@ -1906,10 +1915,20 @@ function deleteTheme(theme, token) {
       const left = split_(u.Themes, ',').filter(function (x) { return x.trim() !== theme; });
       sheet_('Users').getRange(u._row, 4).setValue(left.join(', '));
     });
+    // Optionally move its slides folder to Drive's trash (restorable for 30 days), never when another theme uses it.
+    let folderTrashed = false;
+    const fid = folderId_(row['Slides Folder']);
+    if (trashFolder && fid) {
+      const others = d.themes.filter(function (x) { return x.Theme !== theme && folderId_(x['Slides Folder']) === fid; });
+      if (others.length) throw new Error('The slides folder is also used by ' + others.map(function (x) { return x.Theme; }).join(', ') + ', so it can\'t go to the trash.');
+      DriveApp.getFolderById(fid).setTrashed(true);
+      CacheService.getScriptCache().remove('folder:' + fid);
+      folderTrashed = true;
+    }
     sheet_('Themes').deleteRow(row._row);
-    log_(me, 'Deleted theme', theme + ': ' + r.devices.length + ' TVs moved to ' + fallback + ', ' +
+    log_(me, 'Deleted theme', theme + (folderTrashed ? ' (slides folder moved to Drive trash)' : '') + ': ' + r.devices.length + ' TVs moved to ' + fallback + ', ' +
          (r.weekly.length + r.special.length + r.override.length + r.presets.length) + ' schedule rows now follow each TV\'s theme');
-    return { fallback: fallback, devices: r.devices.length };
+    return { fallback: fallback, devices: r.devices.length, folderTrashed: folderTrashed };
   });
 }
 

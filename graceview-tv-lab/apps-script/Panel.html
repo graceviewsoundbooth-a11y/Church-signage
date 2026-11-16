@@ -375,6 +375,14 @@ function themeAdminBox(theme){
   return themeDuplicateBox(theme)+themeFallbackBox(theme);
 }
 var themeDup=null;
+/* The delete step's choice about the theme's slides folder. */
+function themeDelFolderOption(u){
+  var f=u.folder;
+  if(!f)return '<span class="small muted">It has no slides folder.</span>';
+  var what=esc(f.name||'its slides folder')+(f.error?'':' ('+f.files+' file'+(f.files===1?'':'s')+')');
+  if(f.sharedWith&&f.sharedWith.length)return '<label class="small" style="display:flex;gap:8px;align-items:flex-start;opacity:.6"><input type="checkbox" disabled><span>Also move '+what+' to Google Drive’s trash<br><span class="muted">Not available: '+esc(f.sharedWith.join(', '))+' uses the same folder, so it stays.</span></span></label>';
+  return '<label class="small" style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="delTrashFolder"><span>Also move '+what+' to Google Drive’s trash<br><span class="muted">Left unticked, the folder stays in Drive. From the trash it can be restored for 30 days.</span></span></label>';
+}
 /* Duplicate: a new theme with everything copied, and a short form for name, colors and slides. */
 function themeDuplicateBox(theme){
   if(!themeDup||themeDup.source!==theme)return '<div class="row"><button class="btn sm" data-act="dupOpen" data-t="'+esc(theme)+'">Duplicate…</button>'+
@@ -420,7 +428,8 @@ function themeFallbackBox(theme){
   if(u.users.length)lines.push(esc(u.users.join(', '))+' will lose access to it');
   return h+'<div class="confirm" style="flex-direction:column;align-items:flex-start"><b>Delete '+esc(theme)+'?</b>'+
     (lines.length?'<ul class="small" style="margin:0;padding-left:20px"><li>'+lines.join('</li><li>')+'</li></ul>':'<span class="small">Nothing uses it.</span>')+
-    '<span class="small muted">Its slides folder stays in Google Drive. This can’t be undone from the dashboard.</span>'+
+    themeDelFolderOption(u)+
+    '<span class="small muted">Deleting the theme can’t be undone from the dashboard.</span>'+
     '<div class="row"><button class="btn danger" data-act="themeDelGo" data-t="'+esc(theme)+'">Delete theme</button><button class="btn" data-act="themeDelCancel">Cancel</button></div></div>';
 }
 function addThemeForm(){
@@ -931,7 +940,8 @@ var ACT={
 
   themeDelGo:function(b){
     var t=b.dataset.t;
-    call('deleteTheme',[t],'',function(r){themeDel=null;themeForm=null;toast('Deleted '+t+(r&&r.devices?'. '+r.devices+' TV'+(r.devices===1?'':'s')+' now use '+r.fallback+'.':'.'));});
+    var trash=!!(document.getElementById('delTrashFolder')||{}).checked;
+    call('deleteTheme',[t,trash],'',function(r){themeDel=null;themeForm=null;toast('Deleted '+t+(r&&r.devices?'. '+r.devices+' TV'+(r.devices===1?'':'s')+' now use '+r.fallback:'')+(r&&r.folderTrashed?'. Its slides folder is in Drive’s trash.':'.'));});
   },
   pickTheme:function(b){themeDel=null;themeForm=JSON.parse(JSON.stringify(S.themes.filter(function(t){return t.Theme===b.dataset.t;})[0]));render();},
   resetTheme:function(){themeForm=null;render();},
