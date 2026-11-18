@@ -47,20 +47,53 @@ data class CalEvent(val start: ZonedDateTime, val allDay: Boolean, val title: St
 object CalendarRepo {
     fun isLink(value: String) = Regex("^(webcal|https?)://", RegexOption.IGNORE_CASE).containsMatchIn(value.trim())
 
+    /** The cell may list several calendars separated by ";", first = main, the rest = fallbacks. */
+    fun sources(value: String): List<String> = value.split(';').map { it.trim() }.filter { it.isNotEmpty() }
+
+    /**
+     * Events from the first calendar. When it has fewer than Config.CALENDAR_MIN_EVENTS, the next
+     * calendars fill the list up to Config.CALENDAR_FILL_TO (decided 2026-11-18: the school's
+     * Brightwheel calendar, then the church's). Fallbacks are only fetched when needed; a failed
+     * fallback is skipped, and the fetch fails only when the first calendar fails and no fallback works.
+     */
     suspend fun fetch(value: String, hide: List<String>): List<CalEvent> {
         val now = ZonedDateTime.now(Config.ZONE)
         val end = now.plusDays(7)
-        val events = if (isLink(value)) {
-            val url = value.trim().replaceFirst(Regex("^webcal://", RegexOption.IGNORE_CASE), "https://")
+        val lists = mutableListOf<List<CalEvent>>()
+        var firstError: Exception? = null
+        for ((i, src) in sources(value).withIndex()) {
+            if (i > 0 && lists.sumOf { it.size } >= Config.CALENDAR_MIN_EVENTS) break
+            try {
+                lists += fetchOne(src, now, end).filter { ev -> hide.none { h -> ev.title.contains(h, ignoreCase = true) } }
+            } catch (e: Exception) {
+                if (i == 0) firstError = e
+            }
+        }
+        if (lists.isEmpty()) throw firstError ?: IllegalStateException("No calendar")
+        return combine(lists)
+    }
+
+    /** Every event of the first list, topped up from the next lists, sorted by start. */
+    fun combine(lists: List<List<CalEvent>>): List<CalEvent> {
+        val out = lists.firstOrNull()?.sortedBy { it.start }?.toMutableList() ?: return emptyList()
+        for (more in lists.drop(1)) {
+            if (out.size >= Config.CALENDAR_MIN_EVENTS) break
+            val seen = out.map { it.title.lowercase() to it.start }.toSet()
+            out += more.sortedBy { it.start }
+                .filter { (it.title.lowercase() to it.start) !in seen }
+                .take(Config.CALENDAR_FILL_TO - out.size)
+        }
+        return out.sortedBy { it.start }
+    }
+
+    private suspend fun fetchOne(value: String, now: ZonedDateTime, end: ZonedDateTime): List<CalEvent> =
+        if (isLink(value)) {
+            val url = value.replaceFirst(Regex("^webcal://", RegexOption.IGNORE_CASE), "https://")
             val text = Net.getString(url)
             withContext(Dispatchers.Default) { fromIcs(text, now, end) }
         } else {
-            fromGoogle(value.trim(), now, end)
+            fromGoogle(value, now, end)
         }
-        return events
-            .filter { ev -> hide.none { h -> ev.title.contains(h, ignoreCase = true) } }
-            .sortedBy { it.start }
-    }
 
     private fun fromIcs(text: String, now: ZonedDateTime, end: ZonedDateTime): List<CalEvent> {
         val zone = Config.ZONE

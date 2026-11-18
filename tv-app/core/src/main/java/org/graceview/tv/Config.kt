@@ -28,6 +28,13 @@ object Config {
     /** Longest any one announcement stays up. Images show this long; videos end early or get cut here. */
     const val SLIDE_MAX_MS = 12_000L
 
+    /**
+     * Themes Calendar cell with several calendars ("school; church"): when the first has fewer
+     * than CALENDAR_MIN_EVENTS in the next 7 days, the others fill the list up to CALENDAR_FILL_TO.
+     */
+    const val CALENDAR_MIN_EVENTS = 3
+    const val CALENDAR_FILL_TO = 4
+
     /** A video whose file name contains this tag (any case) plays to its end (decided 2026-11-13). */
     const val FULL_VIDEO_TAG = "[full]"
 

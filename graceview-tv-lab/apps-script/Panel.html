@@ -104,6 +104,7 @@ tr.flag td:first-child{box-shadow:inset 4px 0 var(--warn)}
 .tog input{margin:0}
 .lnTiles{display:flex;flex-direction:column;gap:8px}
 .lnTile{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.calRow{display:flex;flex-direction:column;gap:6px}
 .drop{border:2px dashed var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:10px;background:var(--sunk);position:relative}
 .drop.over{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 8%,var(--sunk))}
 .thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
@@ -345,15 +346,54 @@ function specialForm(){
 /* ---------- Themes ---------- */
 var THEME_FIELDS=[['Display Name','Name on screens'],['Logo URL','Logo link (https, optional)'],['Wayfinding Left','Left arrows, separated by ;'],['Wayfinding Right','Right arrows, separated by ;'],
   ['QR Label','QR code label'],['QR Link','QR code link'],['Wi-Fi Name','Guest Wi-Fi name'],['Wi-Fi Password','Guest Wi-Fi password'],
-  ['Calendar','Calendar links: webcal, .ics or Google Calendar ID (separate with ;)'],['Calendar Hide','Hide events containing (;)'],
+  ['Calendar Hide','Hide calendar events containing (separate with ;)'],
   ['Slides Folder','Slides folder (Google Drive folder link)']];
+/* ---------- Calendars: a main calendar plus fallbacks ----------
+ * Stored in the theme's Calendar cell as "main; fallback 1; fallback 2". If the main calendar has fewer
+ * than 3 events in the next 7 days, the fallbacks top This Week up to 4, in order (same rule as the TV app).
+ */
+var calCheck=null;
+function calList(){var v=String(themeForm.Calendar||'');var l=v.split(/;|\n/).map(function(x){return x.trim();});return v.trim()?l:[''];}
+function calSet(list){themeForm.Calendar=list.map(function(x){return x.trim();}).filter(function(x,i){return x||i===0;}).join('; ');}
+function calSaved(){return (S.themes.filter(function(t){return t.Theme===themeForm.Theme;})[0]||{}).Calendar||'';}
+/* Status for the calendars as written now: a fresh Check-all result, or the saved status if unchanged. */
+function calResult(){
+  if(calCheck&&calCheck.theme===themeForm.Theme&&calCheck.text===String(themeForm.Calendar||''))return calCheck.result;
+  if(String(themeForm.Calendar||'')===calSaved())return (S.calStatus||{})[themeForm.Theme]||null;
+  return null;
+}
+function calChip(src){
+  if(!src)return '';
+  if(src.state==='loaded')return '<span class="chip '+(src.used?'ok':'')+'">'+src.count+' event'+(src.count===1?'':'s')+(src.used?' · in use':' · not needed')+'</span>';
+  if(src.state==='unused')return '<span class="chip">Not needed this week</span>';
+  if(src.state==='invalid')return '<span class="chip bad">Not a calendar link</span>';
+  return '<span class="chip bad">Can’t read it</span>';
+}
+function calEditor(){
+  var list=calList(),r=calResult(),srcs=(r&&r.sources)||[];
+  var rows=list.map(function(v,i){
+    var st=v?srcs.filter(function(x){return x.url===v;})[0]||null:null;
+    return '<div class="calRow"><div class="small" style="font-weight:600">'+(i===0?'Main calendar':'Fallback '+i)+'</div>'+
+      '<div class="row" style="flex-wrap:nowrap"><input type="text" id="calSrc'+i+'" data-calsrc="'+i+'" value="'+esc(v)+'" placeholder="webcal://… or https://….ics or a Google Calendar ID" spellcheck="false" style="flex:1;min-width:0">'+
+      (list.length>1?'<button class="btn sm" data-act="calMove" data-i="'+i+'" data-d="-1" aria-label="Move up"'+(i===0?' disabled':'')+'>↑</button>'+
+        '<button class="btn sm" data-act="calMove" data-i="'+i+'" data-d="1" aria-label="Move down"'+(i===list.length-1?' disabled':'')+'>↓</button>'+
+        '<button class="btn sm danger" data-act="calRemove" data-i="'+i+'">Remove</button>':'')+'</div>'+
+      '<div class="small" id="calStat'+i+'">'+calChip(st)+(st&&st.error?' <span class="muted">'+esc(st.error)+'</span>':'')+'</div></div>';
+  }).join('');
+  return '<div class="cpair"><div class="cpair-h"><b>Calendars for This Week</b><button class="btn sm" data-act="calCheckAll">Check all calendars</button></div>'+
+    '<p class="small muted" style="margin:0">This Week shows the main calendar. If it has fewer than 3 events in the next 7 days, the fallbacks fill the list up to 4, in order, each event once. Fallbacks are only read when needed.</p>'+
+    rows+'<div><button class="btn sm" data-act="calAdd">+ Add a fallback calendar</button></div></div>';
+}
 function calNote(){
-  var c=(S.calStatus||{})[themeForm.Theme]||{},saved=(S.themes.filter(function(t){return t.Theme===themeForm.Theme;})[0]||{}).Calendar||'';
-  var h='';
-  if(String(themeForm.Calendar||'')!==saved)h+='<div class="small muted">Save to load the new calendar link. The preview still shows the saved one.</div>';
-  if(!c.linked)return h+'<div class="small muted">No calendar linked, so This Week stays empty.</div>';
-  (c.errors||[]).forEach(function(e){h+='<div class="warnbox">'+esc(e)+'</div>';});
-  if(!(c.errors||[]).length)h+='<div class="small"><span class="chip ok">Calendar loaded</span> '+c.count+' event'+(c.count===1?'':'s')+' in the next 7 days, after hiding.</div>';
+  var saved=calSaved(),r=calResult(),h='';
+  if(String(themeForm.Calendar||'')!==saved)h+='<div class="small muted">Save the theme to use these calendars. Previews still show the saved ones'+(r?'':'; Check all calendars tests them now')+'.</div>';
+  if(!String(themeForm.Calendar||'').trim())return h+'<div class="small muted">No calendar, so This Week stays empty.</div>';
+  if(!r)return h;
+  (r.errors||[]).forEach(function(e){h+='<div class="warnbox">'+esc(e)+'</div>';});
+  if((r.sources||[]).some(function(x){return x.state==='loaded';})){
+    var used=(r.sources||[]).filter(function(x){return x.used&&x.n>0;}).length;
+    h+='<div class="small"><span class="chip ok">This Week: '+r.count+' event'+(r.count===1?'':'s')+'</span> '+(used?'with '+used+' fallback'+(used===1?'':'s')+' filling in.':'from the main calendar.')+'</div>';
+  }
   return h;
 }
 /* Slides folder status for a theme, with the fix when there is one. */
@@ -449,7 +489,7 @@ function vThemes(){
   var colors='<div class="cpairs">'+COLOR_PAIRS.map(colorPair).join('')+'</div>';
   var form='<div class="fgrid">'+THEME_FIELDS.map(function(x){return '<label class="f">'+x[1]+'<input type="text" data-f="th.'+x[0]+'" value="'+esc(f[x[0]]||'')+'"></label>';}).join('')+'</div>';
   return '<section class="panel"><h2>Themes</h2><div class="twocol"><div style="display:flex;flex-direction:column;gap:14px">'+list+colors+form+
-    '<div id="thCal">'+calNote()+'</div>'+folderNote(f.Theme)+themeAdminBox(f.Theme)+'<div class="row"><button class="btn pri" data-act="saveTheme">Save '+esc(f.Theme)+'</button><button class="btn" data-act="resetTheme">Undo changes</button></div></div>'+
+    calEditor()+'<div id="thCal">'+calNote()+'</div>'+folderNote(f.Theme)+themeAdminBox(f.Theme)+'<div class="row"><button class="btn pri" data-act="saveTheme">Save '+esc(f.Theme)+'</button><button class="btn" data-act="resetTheme">Undo changes</button></div></div>'+
     '<div><div class="muted small" style="margin-bottom:6px">Preview with wayfinding</div><div class="tvbox" id="thPrev">'+themePreview()+'</div>'+
     '<div class="muted small" style="margin:12px 0 6px">Preview without wayfinding</div><div class="tvbox" id="thPrev2">'+themePreview(true)+'</div></div></div></section>';
 }
@@ -925,6 +965,15 @@ var ACT={
       .withFailureHandler(function(e){themeDel=null;fail(e);}).themeUsage(t,TOKEN);
   },
   themeDelCancel:function(){themeDel=null;render();},
+  calAdd:function(){var l=calList();l.push('');themeForm.Calendar=l.join('; ');render();var e=document.getElementById('calSrc'+(l.length-1));if(e)e.focus();},
+  calRemove:function(b){var l=calList();l.splice(+b.dataset.i,1);calSet(l.length?l:['']);render();},
+  calMove:function(b){var l=calList(),i=+b.dataset.i,j=i+(+b.dataset.d);if(j<0||j>=l.length)return;var x=l[i];l[i]=l[j];l[j]=x;calSet(l);render();},
+  calCheckAll:function(){
+    var theme=themeForm.Theme,text=String(themeForm.Calendar||'');
+    if(!text.trim()){toast('Add a calendar first.',true);return;}
+    busy(true);google.script.run.withSuccessHandler(function(res){busy(false);calCheck={theme:theme,text:text,result:res};if(view==='themes')render();toast('Checked '+(res.sources||[]).length+' calendar'+((res.sources||[]).length===1?'':'s')+'.');})
+      .withFailureHandler(fail).checkCalendars(theme,text,TOKEN);
+  },
   dupOpen:function(b){
     var t=S.themes.filter(function(x){return x.Theme===b.dataset.t;})[0];if(!t)return;
     themeDup={source:t.Theme,name:'',display:t['Display Name']||t.Theme,main:t.Main||'#333333',accent:t.Accent||'#555555',
@@ -951,7 +1000,10 @@ var ACT={
     themeForm[b.dataset.tx]=contrast(bg,light)>=contrast(bg,dark)?light:dark;
     render();toast('Text color set to '+(themeForm[b.dataset.tx]===light?'white':'near-black')+'. Save to keep it.');
   },
-  saveTheme:function(){call('saveTheme',[themeForm],'Theme saved',function(){themeForm=JSON.parse(JSON.stringify(themeForm));});},
+  saveTheme:function(){
+    themeForm.Calendar=calList().filter(function(x){return x;}).join('; '); // drop empty calendar boxes
+    call('saveTheme',[themeForm],'Theme saved',function(){themeForm=JSON.parse(JSON.stringify(themeForm));calCheck=null;});
+  },
   slideTheme:function(b){slideTheme=b.dataset.t;pendingDelete=null;render();},
   fileMove:function(b){call('moveSlideFile',[slideTheme,b.dataset.id,+b.dataset.dir],'Reordered');},
   fileDates:function(b){var id='f'+b.dataset.i;call('setSlideFileDates',[slideTheme,b.dataset.id,val(id+'From'),val(id+'Until')],'Dates saved');},
@@ -1070,6 +1122,12 @@ function onField(e){
     refreshThemePreview();}
 }
 document.addEventListener('input',onField);
+document.addEventListener('input',function(e){
+  var el=e.target;if(!el||!el.dataset||el.dataset.calsrc===undefined||!themeForm)return;
+  var l=calList();l[+el.dataset.calsrc]=el.value;themeForm.Calendar=l.map(function(x){return x.trim();}).join('; ');
+  var st=document.getElementById('calStat'+el.dataset.calsrc);if(st)st.innerHTML='';
+  var n=document.getElementById('thCal');if(n)n.innerHTML=calNote();
+});
 document.addEventListener('input',function(e){
   var el=e.target;if(!el||!el.dataset||!el.dataset.dup||!themeDup)return;
   var id=el.dataset.dup,key={dupMain:'main',dupAccent:'accent',dupMainText:'mainText',dupAccentText:'accentText'}[id];

@@ -502,14 +502,22 @@ function trashSlideFile(theme, fileId, token) {
 function eventsFor_(th, t) { return calendar_(th, t).events; }
 
 /* ---------- Calendars ----------
- * Each theme's Calendar cell holds one or more links, separated by ";":
- *   webcal://… or https://….ics   (ShelbyNext and most church calendars)
+ * Each theme's Calendar cell holds one or more calendars, separated by ";":
+ *   webcal://… or https://….ics   (ShelbyNext, Brightwheel and most church calendars)
  *   a Google Calendar ID           (the calendar must be public)
- * The server fetches and reads the feed, so browsers never touch it. Results are cached for 15 minutes.
+ * The first is the main calendar; the rest are fallbacks (decided 2026-11-18, same rule as the TV app):
+ * when the main calendar has fewer than CAL_MIN_EVENTS events in the next 7 days, the next calendars
+ * fill This Week up to CAL_FILL_TO, sorted by start, each event once. Fallbacks are only fetched when
+ * needed; one that fails is skipped. The server reads the feeds, so browsers never touch them.
+ * Each calendar is cached for 15 minutes (2 after an error).
  */
 
+const CAL_MIN_EVENTS = 3;
+const CAL_FILL_TO = 4;
+
+/** The calendars in a Calendar cell, in order. Each is a fetchable https link, or null if it isn't valid. */
 function calUrls_(src) {
-  return split_(src, /[;\s]+/).map(function (x) {
+  return split_(src, /;|\n/).map(function (x) {
     if (/^webcal:\/\//i.test(x)) return 'https://' + x.slice(9);
     if (/^https:\/\//i.test(x)) return x;
     if (x.indexOf('@') > 0 && x.indexOf('/') < 0) {
@@ -523,57 +531,109 @@ function digest_(s) {
   return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, s, Utilities.Charset.UTF_8));
 }
 
-/** Returns { events (up to 4, for This Week), count (in the next 7 days), errors }. */
-function calendar_(th, t) {
-  const src = String(th.Calendar || '').trim();
-  if (!src) return { events: [], count: 0, errors: [] };
-  const winEnd = addDays_(t.ymd, 7);
+/** One calendar's events in the 7 days from t, cached per calendar and day. { ok, events, error } */
+function fetchCalendar_(url, t) {
   const cache = CacheService.getScriptCache();
-  const key = 'cal:' + digest_(src + '|' + (th['Calendar Hide'] || '') + '|' + t.ymd);
-  let all = null;
+  const key = 'cal1:' + digest_(url + '|' + t.ymd);
   const hit = cache.get(key);
-  if (hit) all = JSON.parse(hit);
-  if (!all) {
-    all = { events: [], errors: [] };
-    const hide = split_(th['Calendar Hide'], ';').map(function (x) { return x.toLowerCase(); });
-    calUrls_(src).forEach(function (url, i) {
-      const which = 'Calendar link ' + (i + 1);
-      if (!url) { all.errors.push(which + ' isn\'t a webcal link, an https link or a Google Calendar ID.'); return; }
-      try {
-        const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
-        const body = res.getContentText();
-        if (res.getResponseCode() !== 200 || body.indexOf('BEGIN:VCALENDAR') < 0) {
-          all.errors.push(which + ' didn\'t return a calendar (HTTP ' + res.getResponseCode() + '). Check the link, and that a Google calendar is public.');
-          return;
-        }
-        all.events = all.events.concat(parseIcs_(body, t.ymd, winEnd));
-      } catch (err) {
-        all.errors.push(which + ' couldn\'t be read: ' + err.message);
-      }
-    });
-    all.events = all.events
-      .filter(function (e) {
-        const title = String(e.title).toLowerCase();
-        return !hide.some(function (h) { return title.indexOf(h) >= 0; });
-      })
-      .sort(function (a, b) {
-        if (a.ymd !== b.ymd) return a.ymd < b.ymd ? -1 : 1;
-        if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
-        return a.mins - b.mins;
-      });
-    try { cache.put(key, JSON.stringify(all), all.errors.length ? 120 : 900); } catch (err) { /* too big to cache */ }
+  if (hit) return JSON.parse(hit);
+  let out;
+  try {
+    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+    const body = res.getContentText();
+    if (res.getResponseCode() !== 200 || body.indexOf('BEGIN:VCALENDAR') < 0) {
+      out = { ok: false, events: [], error: 'Didn\'t return a calendar (HTTP ' + res.getResponseCode() + '). Check the link, and that a Google calendar is public.' };
+    } else {
+      out = { ok: true, events: parseIcs_(body, t.ymd, addDays_(t.ymd, 7)), error: '' };
+    }
+  } catch (err) {
+    out = { ok: false, events: [], error: 'Couldn\'t be read: ' + err.message };
   }
-  const visible = all.events.filter(function (e) {
-    return !(e.ymd === t.ymd && !e.allDay && e.endMins <= t.mins);
+  try { cache.put(key, JSON.stringify(out), out.ok ? 900 : 120); } catch (err) { /* too big to cache */ }
+  return out;
+}
+
+function calSort_(a, b) {
+  if (a.ymd !== b.ymd) return a.ymd < b.ymd ? -1 : 1;
+  if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
+  return a.mins - b.mins;
+}
+
+/**
+ * Every event of the first list, topped up from the next lists while there are fewer than
+ * CAL_MIN_EVENTS, up to CAL_FILL_TO, each event (title + start) once. Also says how many events
+ * each list added, so the Themes page can show which fallbacks were used.
+ */
+function combineCalendars_(lists) {
+  if (!lists.length) return { events: [], added: [] };
+  const out = lists[0].slice().sort(calSort_);
+  const added = [out.length];
+  for (let i = 1; i < lists.length; i++) {
+    if (out.length >= CAL_MIN_EVENTS) { added.push(0); continue; }
+    const seen = {};
+    out.forEach(function (e) { seen[String(e.title).toLowerCase() + '|' + e.ymd + '|' + e.mins] = 1; });
+    const more = lists[i].slice().sort(calSort_)
+      .filter(function (e) { return !seen[String(e.title).toLowerCase() + '|' + e.ymd + '|' + e.mins]; })
+      .slice(0, Math.max(0, CAL_FILL_TO - out.length));
+    added.push(more.length);
+    Array.prototype.push.apply(out, more);
+  }
+  return { events: out.sort(calSort_), added: added };
+}
+
+/**
+ * This Week for a theme: { events (up to 4), count, errors, sources }.
+ * sources has one entry per calendar in the cell: { n, url, state, count, used, error }, where state is
+ * 'loaded', 'error', 'invalid' or 'unused' (a fallback that wasn't needed this week).
+ * checkAll fetches every fallback too (the Themes page's "Check all calendars"), without changing the result.
+ */
+function calendar_(th, t, checkAll) {
+  const src = String(th.Calendar || '').trim();
+  if (!src) return { events: [], count: 0, errors: [], sources: [] };
+  const hide = split_(th['Calendar Hide'], ';').map(function (x) { return x.toLowerCase(); });
+  const keep = function (e) {
+    const title = String(e.title).toLowerCase();
+    if (hide.some(function (h) { return title.indexOf(h) >= 0; })) return false;
+    return !(e.ymd === t.ymd && !e.allDay && e.endMins <= t.mins); // already over today
+  };
+  const raw = split_(src, /;|\n/);
+  const urls = calUrls_(src);
+  const sources = [], lists = [], listOf = [];
+  let have = 0;
+  urls.forEach(function (url, i) {
+    const st = { n: i, url: raw[i], state: '', count: 0, used: false, error: '' };
+    sources.push(st);
+    if (!url) { st.state = 'invalid'; st.error = 'Isn\'t a webcal link, an https link or a Google Calendar ID.'; return; }
+    const needed = i === 0 || lists.length === 0 || have < CAL_MIN_EVENTS;
+    if (!needed && !checkAll) { st.state = 'unused'; return; }
+    const r = fetchCalendar_(url, t);
+    if (!r.ok) { st.state = 'error'; st.error = r.error; return; }
+    const list = r.events.filter(keep);
+    st.state = 'loaded'; st.count = list.length;
+    if (needed) { lists.push(list); listOf.push(i); have = combineCalendars_(lists).events.length; }
   });
+  const combined = combineCalendars_(lists);
+  combined.added.forEach(function (n, k) { if (n > 0 || k === 0) sources[listOf[k]].used = true; });
+  const errors = sources.filter(function (x) { return x.state === 'error' || x.state === 'invalid'; })
+    .map(function (x) { return (x.n === 0 ? 'Main calendar' : 'Fallback ' + x.n) + ': ' + x.error; });
   return {
-    count: all.events.length,
-    errors: all.errors,
-    events: visible.slice(0, 4).map(function (e) {
+    count: combined.events.length,
+    errors: errors,
+    sources: sources,
+    events: combined.events.slice(0, CAL_FILL_TO).map(function (e) {
       return { dow: DAYS[dow_(e.ymd)], today: e.ymd === t.ymd, allDay: e.allDay,
                start: hhmm_(e.mins), end: hhmm_(Math.min(e.endMins, 1439)), title: e.title };
     }),
   };
+}
+
+/** The Themes page's "Check all calendars": every calendar fetched, fallbacks included. */
+function checkCalendars(theme, calendarText, token) {
+  const d = data_(); const me = me_(d, token);
+  need_(me, 'theme', theme);
+  const th = JSON.parse(JSON.stringify(themeRow_(d, theme)));
+  if (calendarText !== undefined && calendarText !== null) th.Calendar = String(calendarText);
+  return calendar_(th, at_(''), true);
 }
 
 /* ---------- iCalendar (.ics) reader ---------- */
@@ -1115,7 +1175,7 @@ function getState(iso, token) {
     eventsByTheme: themes.reduce(function (m, th) { m[th.Theme] = eventsFor_(th, t); return m; }, {}),
     calStatus: themes.reduce(function (m, th) {
       const c = calendar_(th, t);
-      m[th.Theme] = { linked: !!String(th.Calendar || '').trim(), count: c.count, errors: c.errors };
+      m[th.Theme] = { linked: !!String(th.Calendar || '').trim(), count: c.count, errors: c.errors, sources: c.sources };
       return m;
     }, {}),
     weekly: can_(me, 'schedule') ? d.weekly : [], special: can_(me, 'schedule') ? d.special : [],
@@ -1340,11 +1400,12 @@ function toProductionBatch_(d, t) {
 }
 
 /**
- * The TV app reads iCal links itself; a Google Calendar ID would need an API key, so it's sent
- * as the calendar's public iCal link. Only the first link is sent (the app reads one calendar).
+ * The TV app reads iCal links itself; a Google Calendar ID would need an API key, so each is sent as
+ * the calendar's public iCal link. Every calendar is sent, in order and separated by ";", so the TV
+ * applies the same main-then-fallbacks rule. Invalid entries are left out.
  */
 function tvCalendar_(src) {
-  return calUrls_(src || '').filter(function (u) { return !!u; })[0] || '';
+  return calUrls_(src || '').filter(function (u) { return !!u; }).join('; ');
 }
 
 function getTv(deviceKey) {
