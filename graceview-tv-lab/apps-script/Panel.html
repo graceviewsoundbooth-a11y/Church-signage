@@ -1125,7 +1125,7 @@ function onField(e){
 document.addEventListener('input',onField);
 document.addEventListener('input',function(e){
   var el=e.target;if(!el||!el.dataset||el.dataset.calsrc===undefined||!themeForm)return;
-  var l=calList();l[+el.dataset.calsrc]=el.value.replace(/[;\r\n]+/g,' '); // one calendar per box, even if a paste has ";" in itthemeForm.Calendar=l.map(function(x){return x.trim();}).join('; ');
+  var l=calList();l[+el.dataset.calsrc]=el.value.replace(/[;\r\n]+/g,' '); /* one calendar per box, even if a paste has ";" in it */themeForm.Calendar=l.map(function(x){return x.trim();}).join('; ');
   var st=document.getElementById('calStat'+el.dataset.calsrc);if(st)st.innerHTML='';
   var n=document.getElementById('thCal');if(n)n.innerHTML=calNote();
 });
