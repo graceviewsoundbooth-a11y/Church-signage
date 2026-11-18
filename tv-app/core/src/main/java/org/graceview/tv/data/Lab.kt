@@ -43,8 +43,34 @@ data class LabState(
     val launcher: LabLauncher? = null,
     /** Green Room TVs only: the Planning Center login (blank = removed in the dashboard). null for other TVs. */
     val planningCenter: LabPco? = null,
+    /** The dashboard's Church page: website wording, weather spot, time zone. null from older dashboards. */
+    val settings: LabSettings? = null,
     val error: String? = null,
 )
+
+/** Church-wide settings from the dashboard's Church page. lat/lon null = no weather. */
+@Serializable
+data class LabSettings(
+    val website: String = "",
+    val timeZone: String = "",
+    val place: String = "",
+    val lat: Double? = null,
+    val lon: Double? = null,
+    val unit: String = "F",
+    val messageLine: String = "",
+    val noEvents: String = "",
+) {
+    /** Puts these into Config, where the screens, the schedule and the weather read them. */
+    fun apply() {
+        timeZone.takeIf { it.isNotBlank() }?.let { z -> runCatching { java.time.ZoneId.of(z) }.getOrNull()?.let { Config.ZONE = it } }
+        Config.WEATHER_ON = lat != null && lon != null
+        if (lat != null && lon != null) { Config.WEATHER_LAT = lat; Config.WEATHER_LON = lon }
+        Config.WEATHER_PLACE = place
+        Config.WEATHER_CELSIUS = unit.equals("C", ignoreCase = true)
+        Config.MESSAGE_LINE = messageLine
+        if (noEvents.isNotBlank()) Config.NO_EVENTS_TEXT = noEvents
+    }
+}
 
 /**
  * One home screen tile. type: watchlive, return, announcements, dashboard, mirror, hdmi, youtube,

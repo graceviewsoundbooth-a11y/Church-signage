@@ -8,9 +8,7 @@
  *   Preview:     <web app URL>?tv=LOBBY&at=2026-11-22T10:45
  */
 
-const TZ = 'America/Chicago';
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const WEATHER_AT = { lat: 30.0972, lon: -95.6161, place: 'Tomball' };
 const MODES = ['Signage', 'Fullscreen', 'Countdown', 'Live', 'Live Option', 'Launcher', 'Message', 'Dashboard', 'Off'];
 const DAY_VALUES = DAYS.concat(['Weekdays', 'Weekends', 'Daily']);
 
@@ -102,7 +100,7 @@ function addDays_(ymd, n) {
 function dow_(ymd) { return new Date(ymd + 'T12:00:00Z').getUTCDay(); }
 /** Keeps times, dates and IDs as text when written back to the Sheet. */
 function txt_(v) { return (typeof v === 'string' && /^[\d#=+-]/.test(v)) ? "'" + v : v; }
-function stampNow_() { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm'); }
+function stampNow_() { return Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd HH:mm'); }
 
 /** The moment being shown: now in Chicago, or a preview time 'yyyy-MM-ddTHH:mm'. */
 function at_(iso) {
@@ -111,11 +109,11 @@ function at_(iso) {
     ymd = iso.slice(0, 10); mins = mins_(iso.slice(11)); preview = true;
   } else {
     const d = new Date();
-    ymd = Utilities.formatDate(d, TZ, 'yyyy-MM-dd');
-    mins = mins_(Utilities.formatDate(d, TZ, 'HH:mm'));
+    ymd = Utilities.formatDate(d, tz_(), 'yyyy-MM-dd');
+    mins = mins_(Utilities.formatDate(d, tz_(), 'HH:mm'));
   }
   return { ymd: ymd, mins: mins, dow: dow_(ymd), preview: preview, stamp: ymd + ' ' + hhmm_(mins),
-           today: Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd') };
+           today: Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd') };
 }
 
 function data_() {
@@ -289,7 +287,7 @@ function folderFiles_(th, fresh) {
   const cache = CacheService.getScriptCache();
   const key = 'folder:' + id;
   if (!fresh) { const hit = cache.get(key); if (hit) return JSON.parse(hit); }
-  const today = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
+  const today = Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd');
   let out;
   try {
     const folder = DriveApp.getFolderById(id);
@@ -435,7 +433,7 @@ function uploadSlide(theme, fileName, mime, b64, from, until, token) {
     if (from && until && until < from) throw new Error('"Show until" has to be on or after "Show from".');
     const list = folderFiles_(sf.th, true).files;
     const next = list.reduce(function (m, f) { return Math.max(m, f.order || 0); }, 0) + 1;
-    const p = parseSlideName_(fileName, Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'));
+    const p = parseSlideName_(fileName, Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd'));
     p.ext = MEDIA[mime];
     if (from) p.from = from;
     if (until) p.until = until;
@@ -654,14 +652,14 @@ function icsDate_(v, params) {
   let d = null;
   if (m[7] === 'Z') {
     d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
-  } else if (tz && tz !== TZ) {
+  } else if (tz && tz !== tz_()) {
     try { d = Utilities.parseDate(m[1] + m[2] + m[3] + m[4] + m[5] + m[6], tz, 'yyyyMMddHHmmss'); } catch (err) { d = null; }
   }
   if (d) {
-    const s = Utilities.formatDate(d, TZ, 'yyyy-MM-dd HH:mm');
+    const s = Utilities.formatDate(d, tz_(), 'yyyy-MM-dd HH:mm');
     return { ymd: s.slice(0, 10), mins: mins_(s.slice(11)), allDay: false };
   }
-  // Chicago or floating time: already wall-clock.
+  // The church's own zone or floating time: already wall-clock.
   return { ymd: m[1] + '-' + m[2] + '-' + m[3], mins: +m[4] * 60 + +m[5], allDay: false };
 }
 
@@ -824,7 +822,7 @@ function screen_(dev, now, t, d) {
   return {
     device: { id: dev['Device ID'], name: dev.Name, profile: dev.Profile,
               mute: bool_(dev['Mute Live']), wayfinding: bool_(dev.Wayfinding) },
-    mode: now.mode, message: now.message || '', endMins: now.endMins,
+    mode: now.mode, message: now.message || '', endMins: now.endMins, church: churchForScreens_(),
     theme: themeObj_(th),
     slides: slidesFor_(th, t),
     events: eventsFor_(th, t),
@@ -834,15 +832,19 @@ function screen_(dev, now, t, d) {
 }
 
 function weather_() {
+  const c = church_();
+  if (c.lat === null || c.lon === null) return null; // no location set: the weather spot stays empty
   const cache = CacheService.getScriptCache();
-  const hit = cache.get('weather');
-  if (hit) return JSON.parse(hit);
+  const key = 'wx:' + [c.lat, c.lon, c.unit].join(',');
+  const hit = cache.get(key);
+  if (hit) { const w = JSON.parse(hit); w.place = c.place; return w; }
   try {
-    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + WEATHER_AT.lat + '&longitude=' + WEATHER_AT.lon +
-                '&current=temperature_2m,weather_code&temperature_unit=fahrenheit&timezone=America%2FChicago';
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + c.lat + '&longitude=' + c.lon +
+                '&current=temperature_2m,weather_code&temperature_unit=' + (c.unit === 'C' ? 'celsius' : 'fahrenheit') +
+                '&timezone=' + encodeURIComponent(c.timeZone);
     const j = JSON.parse(UrlFetchApp.fetch(url, { muteHttpExceptions: true }).getContentText());
-    const w = { temp: Math.round(j.current.temperature_2m), code: j.current.weather_code, place: WEATHER_AT.place };
-    cache.put('weather', JSON.stringify(w), 900);
+    const w = { temp: Math.round(j.current.temperature_2m), code: j.current.weather_code, place: c.place };
+    cache.put(key, JSON.stringify(w), 900);
     return w;
   } catch (err) {
     return null;
@@ -914,6 +916,98 @@ function setSetting_(key, value) {
     if (v[i][0] === key) { sh.getRange(i + 1, 2).setValue(value); return; }
   }
   sh.appendRow([key, value]);
+}
+
+/* ---------- Church settings ----------
+ * Set on the Church page (Owner and Admin). Stored in the Settings tab:
+ *   Church Name, Website, Time Zone, Weather Place, Weather Lat, Weather Lon, Temperature Unit,
+ *   Message Line (under an Override Now message), No Events Text (This Week with nothing on it).
+ * Blank lines fall back to wording built from the website, so a church only has to fill in the website.
+ */
+const DEFAULT_TZ = 'America/Chicago';
+let tzCache_ = null;
+function validTz_(z) {
+  z = String(z || '').trim();
+  if (!/^[A-Za-z]+(\/[A-Za-z0-9_+-]+){1,2}$|^UTC$/.test(z)) return '';
+  try { Utilities.formatDate(new Date(), z, 'HH:mm'); return z; } catch (err) { return ''; }
+}
+/** The church's time zone. Schedules, calendars and clocks all use it. */
+function tz_() {
+  if (!tzCache_) tzCache_ = validTz_(settings_()['Time Zone']) || DEFAULT_TZ;
+  return tzCache_;
+}
+function num_(v) { const n = parseFloat(v); return isFinite(n) ? n : null; }
+function cleanSite_(v) { return String(v || '').trim().replace(/^https?:\/\//i, '').replace(/\/+$/, ''); }
+function church_() {
+  const st = settings_();
+  const site = cleanSite_(st.Website);
+  const lat = num_(st['Weather Lat']), lon = num_(st['Weather Lon']);
+  const ok = lat !== null && lon !== null && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+  const msgSet = String(st['Message Line'] || '').trim(), evSet = String(st['No Events Text'] || '').trim();
+  return {
+    name: st['Church Name'] || '',
+    website: site,
+    timeZone: tz_(),
+    place: ok ? String(st['Weather Place'] || '').trim() : '',
+    lat: ok ? lat : null,
+    lon: ok ? lon : null,
+    unit: String(st['Temperature Unit'] || '').toUpperCase() === 'C' ? 'C' : 'F',
+    messageLineSet: msgSet,
+    noEventsSet: evSet,
+    // What screens show: the church's own wording, or wording built from the website.
+    messageLine: msgSet || (site ? 'Watch ' + site + ' and your email for updates.' : ''),
+    noEvents: evSet || (site ? 'See all events at ' + site : 'Nothing on the calendar this week.'),
+  };
+}
+/** What screens and TVs need. */
+function churchForScreens_() {
+  const c = church_();
+  return { name: c.name, website: c.website, timeZone: c.timeZone, place: c.place, lat: c.lat, lon: c.lon, unit: c.unit,
+           messageLine: c.messageLine, noEvents: c.noEvents };
+}
+
+/** Town or ZIP search for the weather spot (Open-Meteo's free geocoder, no key). */
+function findPlace(query, token) {
+  const me = me_(data_(), token);
+  if (!needAdminOk_(me)) throw new Error('Only the Owner or an Admin can change church settings.');
+  const q = String(query || '').trim();
+  if (q.length < 2) return [];
+  const res = UrlFetchApp.fetch('https://geocoding-api.open-meteo.com/v1/search?count=6&language=en&format=json&name=' +
+                                encodeURIComponent(q), { muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) throw new Error('The place search isn\'t answering. Try again in a minute.');
+  return (JSON.parse(res.getContentText()).results || []).map(function (r) {
+    return { name: r.name, region: [r.admin1, r.country_code === 'US' ? '' : r.country].filter(function (x) { return !!x; }).join(', '),
+             lat: Math.round(r.latitude * 10000) / 10000, lon: Math.round(r.longitude * 10000) / 10000, timeZone: r.timezone || '' };
+  });
+}
+
+function saveChurchSettings(o, token) {
+  const me = me_(data_(), token);
+  if (!needAdminOk_(me)) throw new Error('Only the Owner or an Admin can change church settings.');
+  o = o || {};
+  const name = String(o.name || '').trim();
+  if (!name) throw new Error('The church needs a name.');
+  const tz = validTz_(o.timeZone);
+  if (!tz) throw new Error('That time zone isn\'t one Google knows. Pick one from the list.');
+  const blank = function (v) { return v === '' || v === null || v === undefined; };
+  const lat = blank(o.lat) ? '' : num_(o.lat), lon = blank(o.lon) ? '' : num_(o.lon);
+  if (lat === null || lon === null || (lat === '') !== (lon === '') || (lat !== '' && (Math.abs(lat) > 90 || Math.abs(lon) > 180)))
+    throw new Error('Pick the weather location from the search results.');
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    setSetting_('Church Name', name);
+    setSetting_('Website', cleanSite_(o.website));
+    setSetting_('Time Zone', tz);
+    setSetting_('Weather Place', lat === '' ? '' : String(o.place || '').trim());
+    setSetting_('Weather Lat', lat === '' ? '' : String(lat));
+    setSetting_('Weather Lon', lon === '' ? '' : String(lon));
+    setSetting_('Temperature Unit', o.unit === 'C' ? 'C' : 'F');
+    setSetting_('Message Line', String(o.messageLine || '').trim());
+    setSetting_('No Events Text', String(o.noEvents || '').trim());
+    tzCache_ = null;
+  } finally { lock.releaseLock(); }
+  log_(me, 'Church settings', name);
+  return church_();
 }
 
 /** The Google account that deployed the app, if that's who is looking. Other visitors come back blank. */
@@ -1155,6 +1249,7 @@ function getState(iso, token) {
   const themes = d.themes.filter(function (x) { return themeOk_(me, x.Theme); });
   return {
     me: me, perms: PERMS[me.role], t: t, url: ScriptApp.getService().getUrl(), church: st['Church Name'] || '',
+    churchSettings: needAdminOk_(me) ? church_() : null, timeZone: tz_(),
     users: can_(me, 'users') ? d.users.map(function (u) {
       return { email: u.Email, name: u.Name, role: u.Role, themes: split_(u.Themes, ','), devices: split_(u.Devices, ','),
                status: u.Status, invitedBy: u['Invited By'], invitedAt: u['Invited At'], lastSignIn: u['Last Sign-in'] };
@@ -1232,7 +1327,7 @@ function tvState_(deviceKey, apps, greenRoomStatus, info) {
   if (greenRoomStatus) saveGreenRoomStatus_(id, greenRoomStatus);
   const t = at_('');
   heartbeat_(dev, resolve_(dev, t, d), info);
-  return { device: dev.Name, church: settings_()['Church Name'] || '', batch: toProductionBatch_(d, t),
+  return { device: dev.Name, church: settings_()['Church Name'] || '', settings: churchForScreens_(), batch: toProductionBatch_(d, t),
            files: folderListings_(d), launcher: launcherFor_(d, dev),
            // Only Green Room TVs ever receive the Planning Center login (empty = removed in the dashboard).
            planningCenter: isGreenRoom_(dev) ? pcoForTv_() : null };
@@ -1674,8 +1769,8 @@ function startOverride(o, token) {
     if (!String(o.devices || '').trim()) throw new Error('Pick at least one TV.');
     if (o.mode === 'Message' && !String(o.message || '').trim()) throw new Error('Type the message to show.');
     let ends = '';
-    if (o.duration === 'eod') ends = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd') + ' 23:59';
-    else if (Number(o.duration) > 0) ends = Utilities.formatDate(new Date(Date.now() + Number(o.duration) * 60000), TZ, 'yyyy-MM-dd HH:mm');
+    if (o.duration === 'eod') ends = Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd') + ' 23:59';
+    else if (Number(o.duration) > 0) ends = Utilities.formatDate(new Date(Date.now() + Number(o.duration) * 60000), tz_(), 'yyyy-MM-dd HH:mm');
     sheet_('Override').getRange(2, 1, 1, 8).setValues([[true, o.devices, o.mode, o.theme || '', o.message || '',
       ends ? "'" + ends : '', me.name, "'" + stampNow_()]]);
     log_(me, 'Started override', o.mode + ' on ' + o.devices + (ends ? ' until ' + ends : ''));

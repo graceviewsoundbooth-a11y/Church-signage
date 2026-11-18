@@ -460,6 +460,11 @@ class SignageViewModel(app: Application) : AndroidViewModel(app) {
                     continue
                 }
                 church.value = st.church
+                st.settings?.let { s ->
+                    val before = weatherKey()
+                    s.apply()
+                    if (weatherKey() != before) weatherChanged.trySend(Unit) // new spot or unit: fetch now
+                }
                 if (st.files.isNotEmpty()) LabFolders.listings = st.files
                 st.batch?.let { sheet.value = sheetRepo.store(it) }
                 if (st.device.isNotBlank() && !st.device.equals(deviceName.value, ignoreCase = true)) {
@@ -606,16 +611,23 @@ class SignageViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Signals a weather location or unit change from the dashboard, so the weather refreshes right away. */
+    private val weatherChanged = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
+    private fun weatherKey() = "${Config.WEATHER_ON}|${Config.WEATHER_LAT}|${Config.WEATHER_LON}|${Config.WEATHER_CELSIUS}|${Config.ZONE.id}"
+
     private suspend fun weatherLoop() {
         while (true) {
-            val ok = try {
+            val ok = if (!Config.WEATHER_ON) {
+                weather.value = null // no location on the Church page: the weather spot stays empty
+                true
+            } else try {
                 weather.value = WeatherRepo.fetch()
                 true
             } catch (e: Exception) {
                 Log.w(TAG, "Weather fetch failed", e)
                 false
             }
-            delay(if (ok) Config.WEATHER_MS else Config.RETRY_MS)
+            kotlinx.coroutines.withTimeoutOrNull(if (ok) Config.WEATHER_MS else Config.RETRY_MS) { weatherChanged.receive() }
         }
     }
 

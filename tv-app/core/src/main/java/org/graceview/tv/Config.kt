@@ -6,11 +6,20 @@ object Config {
     /** "Graceview TV Schedules and Settings". Change only here when the sheet moves. */
     const val SHEET_ID = "1VffKvU_jcE51LroLZtBH2i5zVwUZU2BSgA2_aDU9kYY"
 
-    val ZONE: ZoneId = ZoneId.of("America/Chicago")
+    /*
+     * Church-wide settings. These defaults are Graceview's; a TV paired with the dashboard replaces
+     * them with the dashboard's Church page settings on every check-in (LabSettings.apply).
+     */
+    @Volatile var ZONE: ZoneId = ZoneId.of("America/Chicago")
 
-    const val WEATHER_LAT = 30.0972
-    const val WEATHER_LON = -95.6161
-    const val WEATHER_PLACE = "Tomball"
+    @Volatile var WEATHER_ON = true
+    @Volatile var WEATHER_LAT = 30.0972
+    @Volatile var WEATHER_LON = -95.6161
+    @Volatile var WEATHER_PLACE = "Tomball"
+    @Volatile var WEATHER_CELSIUS = false
+
+    /** The line under an Override Now message. Blank = no line. */
+    @Volatile var MESSAGE_LINE = "Watch graceview.org and your email for updates."
 
     const val SHEET_POLL_MS = 3 * 60_000L
     /** Override Now alone is checked this often, so an emergency message reaches the TVs fast. */
@@ -45,7 +54,7 @@ object Config {
     fun slideMaxMs(name: String, video: Boolean) =
         if (video && name.contains(FULL_VIDEO_TAG, ignoreCase = true)) FULL_VIDEO_MAX_MS else SLIDE_MAX_MS
 
-    const val NO_EVENTS_TEXT = "See all events at graceview.org"
+    @Volatile var NO_EVENTS_TEXT = "See all events at graceview.org"
 
     /**
      * The Google API key, from local.properties at build time. Each app sets it at startup (the TV

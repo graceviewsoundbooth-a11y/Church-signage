@@ -112,7 +112,7 @@ class Scheduler(
      */
     private val idleMode: Mode? = null,
 ) {
-    private val zone = Config.ZONE
+    private val zone get() = Config.ZONE // the church's zone, which the dashboard can change
 
     fun matches(target: String): Boolean = when (target.trim().uppercase(Locale.US)) {
         "ALL" -> true

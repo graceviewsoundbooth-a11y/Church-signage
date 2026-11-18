@@ -84,8 +84,19 @@ A launcher is the home screen people see when they leave the slides (or all the 
 
 On **Green Room**: the **Planning Center login** (personal access token: Application ID and Secret; shown only as "Saved, ID …abcd" and sent only to Green Room TVs, which store it encrypted), the service type, mic assignment source, ProPresenter address and timer, Avantis address and MIDI channel, and the **mic map**. **Connections** shows whether each Green Room TV reaches Planning Center, ProPresenter and the Avantis (reported while its dashboard is open). ProPresenter and the Avantis are read-only and only reachable from the church network. The addresses in the lab are stand-ins.
 
+## Church
+
+On **Church** (Owner and Admin), the church-wide settings, stored on the Settings tab:
+
+- **Church name** and **website** (e.g. `graceview.org`).
+- **Weather location:** search a town or ZIP code (Open-Meteo's free place search, no key) and pick it. This also sets the time zone. You can rename the label shown next to the temperature. **No weather** leaves the weather spot empty. Choose **°F or °C**.
+- **Time zone:** schedules, clocks and calendar times all use it.
+- **Wording on the screens:** the line under an Override Now message and the This Week text when the calendar is empty. Leave them blank to use wording built from the website ("Watch graceview.org and your email for updates.", "See all events at graceview.org"). A preview shows the emergency message.
+
+Paired TVs pick up changes on their next check-in. The weather refreshes right away when its location or unit changes.
+
 ## Known limits
 
 - Apps Script is slower than a real server: a save takes 1 to 3 seconds; TVs see changes within about 15 seconds.
 - Browser screens can't play the live feed or video from Drive (videos show as a still). The native app plays both.
-- Calendar times are read as Central time unless the feed says otherwise.
+- Calendar times without a zone in the feed are read in the church's time zone.

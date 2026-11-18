@@ -1,5 +1,6 @@
 package org.graceview.tv.ui
 
+import org.graceview.tv.Config
 import android.net.Uri
 import android.view.LayoutInflater
 import androidx.annotation.OptIn
@@ -126,7 +127,7 @@ fun MessageScreen(theme: Theme, message: String, logo: File?) {
                 T("IMPORTANT UPDATE", 48, weight = FontWeight.ExtraBold, family = Montserrat, color = amber, letterSpacingEm = 0.08f)
             }
             T(message.ifBlank { " " }, textSize, weight = FontWeight.ExtraBold, family = Montserrat, lineHeight = 1.08f)
-            T("Watch graceview.org and your email for updates.", 50, color = Color(0xFFD6D9DF))
+            if (Config.MESSAGE_LINE.isNotBlank()) T(Config.MESSAGE_LINE, 50, color = Color(0xFFD6D9DF))
         }
         Row(
             Modifier.fillMaxWidth().height(u(150)).border(u(1), Color(0xFF2E333C)).padding(horizontal = u(160)),

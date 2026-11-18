@@ -155,7 +155,7 @@ function scrSignage(s,clk,wx,o){
   var th=s.theme,p=pickSlide(s,o);
   var ev=s.events.length?s.events.map(function(e){
     return '<div class="scr-ev"><b>'+esc(e.today?'Today':e.dow)+' · '+esc(e.allDay?'All day':fmtRange(e.start,e.end))+'</b><span>'+esc(e.title)+'</span></div>';
-  }).join(''):'<div class="scr-ev"><span>Nothing on the calendar this week.</span></div>';
+  }).join(''):'<div class="scr-ev"><span>'+esc((s.church&&s.church.noEvents)||'Nothing on the calendar this week.')+'</span></div>';
   var q=o.qr!==false;
   var qrs='<div class="scr-qrs"><div class="scr-qr">'+(q?qrBox(th.qrLink):'<i class="ph"></i>')+esc(th.qrLabel)+'</div>'+
     (th.wifiName?'<div class="scr-qr">'+(q?qrBox('WIFI:T:WPA;S:'+th.wifiName+';P:'+th.wifiPass+';;'):'<i class="ph"></i>')+'Free Wi-Fi</div>':'')+'</div>';
@@ -196,7 +196,7 @@ function scrMessage(s,clk){
   return '<div class="scr-msg"><div class="bar"></div><div class="main">'+
     '<div class="hd">'+warn+'IMPORTANT UPDATE</div>'+
     '<div class="bd" style="font-size:'+size+'px">'+(esc(msg)||'&nbsp;')+'</div>'+
-    '<div class="sub">Watch graceview.org and your email for updates.</div></div>'+
+    (s.church&&s.church.messageLine?'<div class="sub">'+esc(s.church.messageLine)+'</div>':'')+'</div>'+
     '<div class="ft"><div class="brand">'+logoHTML(s.theme)+(safeUrl(s.theme.logo)?'':esc(s.theme.display))+'</div><span>'+c.t+' '+c.ap+'</span></div></div>';
 }
 function scrDash(s,clk){

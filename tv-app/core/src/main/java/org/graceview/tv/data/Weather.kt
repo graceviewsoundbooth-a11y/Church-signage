@@ -23,7 +23,7 @@ object WeatherRepo {
     suspend fun fetch(): Weather {
         val url = "https://api.open-meteo.com/v1/forecast" +
             "?latitude=${Config.WEATHER_LAT}&longitude=${Config.WEATHER_LON}" +
-            "&current=temperature_2m,weather_code,is_day&temperature_unit=fahrenheit" +
+            "&current=temperature_2m,weather_code,is_day&temperature_unit=" + (if (Config.WEATHER_CELSIUS) "celsius" else "fahrenheit") +
             "&timezone=" + Net.enc(Config.ZONE.id)
         val c = Net.json.decodeFromString<OmResponse>(Net.getString(url)).current
         return Weather(c.temp.roundToInt(), c.code, c.isDay == 1)

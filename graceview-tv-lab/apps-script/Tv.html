@@ -37,8 +37,12 @@ var D=null,slideIndex=0,lastSlideAt=Date.now(),lastKey='',pairing=null,pollTimer
 
 function store(k,v){try{if(v===undefined)return localStorage.getItem(k)||'';if(v)localStorage.setItem(k,v);else localStorage.removeItem(k);}catch(e){return '';}}
 function esc2(s){return esc(s);}
+/* The clock in the church's time zone (Church page), whatever zone this computer is in. */
 function chicagoNow(){
-  var f=new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+  var z=(D&&D.screen&&D.screen.church&&D.screen.church.timeZone)||'America/Chicago';
+  var f;try{f=new Intl.DateTimeFormat('en-US',{timeZone:z,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});}
+  catch(e){z='America/Chicago';}
+  if(!f)f=new Intl.DateTimeFormat('en-US',{timeZone:z,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
   var p={};f.formatToParts(new Date()).forEach(function(x){p[x.type]=x.value;});
   return {ymd:p.year+'-'+p.month+'-'+p.day,mins:(+p.hour)*60+(+p.minute),secs:+p.second};
 }
