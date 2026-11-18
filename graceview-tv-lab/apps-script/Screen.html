@@ -55,11 +55,19 @@
 .scr-badge{background:#E01B1B;color:#fff;font-weight:700;font-size:44px;letter-spacing:.12em;padding:10px 28px;border-radius:8px}
 .scr-live h1{font-family:Montserrat,'Segoe UI',Arial,sans-serif;font-size:80px;margin:0}
 .scr-live p{font-size:40px;margin:0;color:#9aa3ad}
-.scr-msg{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--m)}
-.scr-msg .hd{height:170px;background:var(--a);color:var(--at);display:flex;align-items:center;padding:0 110px;font-family:Montserrat,'Segoe UI',Arial,sans-serif;
-  font-weight:700;font-size:64px;letter-spacing:.06em}
-.scr-msg .bd{flex:1;display:flex;align-items:center;padding:0 110px;font-size:84px;line-height:1.18;font-weight:600}
-.scr-msg .ft{height:170px;display:flex;align-items:center;justify-content:space-between;padding:0 110px;font-size:44px;background:rgba(0,0,0,.18)}
+/* Message (Override Now): a fixed emergency look, not the theme's colors, so it never reads as a regular slide.
+   Same design as the TV app's MessageScreen (design/Special-Override). */
+.scr-msg{position:absolute;inset:0;display:flex;flex-direction:column;background:#14171C;color:#fff}
+.scr-msg .bar{height:28px;background:#F2A900;flex:none}
+.scr-msg .main{flex:1;display:flex;flex-direction:column;justify-content:center;gap:40px;padding:100px 160px;min-height:0}
+.scr-msg .hd{display:flex;align-items:center;gap:24px;color:#F2A900;font-family:Montserrat,'Segoe UI',Arial,sans-serif;font-weight:800;font-size:48px;letter-spacing:.08em}
+.scr-msg .hd svg{width:84px;height:84px;flex:none}
+.scr-msg .bd{font-family:Montserrat,'Segoe UI',Arial,sans-serif;font-weight:800;line-height:1.08;overflow-wrap:anywhere}
+.scr-msg .sub{font-size:50px;color:#D6D9DF}
+.scr-msg .ft{height:150px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 160px;border-top:1px solid #2E333C;font-size:48px;font-weight:300}
+.scr-msg .ft .brand{display:flex;align-items:center;gap:20px;font-family:Montserrat,'Segoe UI',Arial,sans-serif;font-weight:700;font-size:40px;color:#fff}
+.scr-msg .ft .scr-logo{width:96px;height:96px;font-size:48px;color:#fff;border-color:#fff}
+.scr-msg .ft .scr-logo-img{max-width:240px;max-height:110px}
 .scr-dash{position:absolute;inset:0;background:#111418;color:#E8ECF1;display:flex;flex-direction:column}
 .scr-dash .tb{height:120px;background:#1B2027;display:flex;align-items:center;justify-content:space-between;padding:0 48px;font-size:40px}
 .scr-dash .tb b{font-family:Montserrat,'Segoe UI',Arial,sans-serif}
@@ -182,8 +190,14 @@ function scrLive(s){
 }
 function scrMessage(s,clk){
   var c=clockParts(clk.mins);
-  return '<div class="scr-msg"><div class="hd">IMPORTANT UPDATE</div><div class="bd">'+esc(s.message)+'</div>'+
-    '<div class="ft"><span>'+esc(s.theme.display)+'</span><span>'+c.t+' '+c.ap+'</span></div></div>';
+  var msg=String(s.message||''),size=msg.length>140?72:msg.length>80?96:120; // same steps as the TV app
+  var warn='<svg viewBox="0 0 48 48" fill="none" stroke="#F2A900" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+
+    '<path d="M24 5 44 41H4Z"/><path d="M24 19v10M24 35v1"/></svg>';
+  return '<div class="scr-msg"><div class="bar"></div><div class="main">'+
+    '<div class="hd">'+warn+'IMPORTANT UPDATE</div>'+
+    '<div class="bd" style="font-size:'+size+'px">'+(esc(msg)||'&nbsp;')+'</div>'+
+    '<div class="sub">Watch graceview.org and your email for updates.</div></div>'+
+    '<div class="ft"><div class="brand">'+logoHTML(s.theme)+(safeUrl(s.theme.logo)?'':esc(s.theme.display))+'</div><span>'+c.t+' '+c.ap+'</span></div></div>';
 }
 function scrDash(s,clk){
   var c=clockParts(clk.mins),d=ymdParts(clk.ymd);
