@@ -206,14 +206,38 @@ function conflicts_(d) {
 
 function themeObj_(th) {
   th = th || {};
+  const wifi = themeWifi_(th);
   return {
     name: th.Theme || '', display: th['Display Name'] || th.Theme || '',
-    main: th.Main || '#333333', accent: th.Accent || '#555555', logo: th['Logo URL'] || '',
+    main: th.Main || '#333333', accent: th.Accent || '#555555', logo: logoImg_(themeLogo_(th)),
     mainText: th['Main Text'] || '#FFFFFF', accentText: th['Accent Text'] || '#FFFFFF',
     wayL: split_(th['Wayfinding Left'], ';'), wayR: split_(th['Wayfinding Right'], ';'),
     qrLabel: th['QR Label'] || 'Info', qrLink: th['QR Link'] || '',
-    wifiName: th['Wi-Fi Name'] || '', wifiPass: th['Wi-Fi Password'] || '',
+    wifiName: wifi.name, wifiPass: wifi.pass,
   };
+}
+
+/*
+ * Church-wide defaults (Church page): a theme with no logo uses the church logo, and a theme with no
+ * guest Wi-Fi name uses the church's guest Wi-Fi. A theme's own values always win.
+ */
+function themeLogo_(th) { return String(th['Logo URL'] || '').trim() || String(settings_()['Church Logo'] || '').trim(); }
+function themeWifi_(th) {
+  if (String(th['Wi-Fi Name'] || '').trim()) return { name: th['Wi-Fi Name'], pass: th['Wi-Fi Password'] || '' };
+  const st = settings_();
+  return { name: String(st['Wi-Fi Name'] || '').trim(), pass: String(st['Wi-Fi Password'] || '') };
+}
+/** A Drive file's ID from its link (or a bare ID), else ''. */
+function driveFileId_(link) {
+  const v = String(link || '').trim();
+  const m = v.match(/\/d\/([A-Za-z0-9_-]{20,})/) || v.match(/[?&]id=([A-Za-z0-9_-]{20,})/) || v.match(/^([A-Za-z0-9_-]{25,})$/);
+  return m ? m[1] : '';
+}
+/** An image address browsers can show: Drive links become Drive's image link (the file must be shared by link). */
+function logoImg_(link) {
+  const id = driveFileId_(link);
+  if (id) return 'https://drive.google.com/thumbnail?id=' + id + '&sz=w1000';
+  return /^https:\/\//i.test(String(link || '')) ? String(link) : '';
 }
 
 /** What plays for a theme: the files in its slides folder that are in their dates, in file-name order. */
@@ -903,13 +927,17 @@ function sessionEmail_(token) {
   return s.email;
 }
 
+let settingsCache_ = null; // read once per request; cleared on every write
 function settings_() {
+  if (settingsCache_) return Object.assign({}, settingsCache_);
   const out = {};
   try { sheet_('Settings').getDataRange().getDisplayValues().slice(1).forEach(function (r) { if (r[0]) out[r[0]] = r[1]; }); }
-  catch (err) { /* no Settings tab yet */ }
-  return out;
+  catch (err) { return out; /* no Settings tab yet */ }
+  settingsCache_ = out;
+  return Object.assign({}, out);
 }
 function setSetting_(key, value) {
+  settingsCache_ = null;
   const sh = sheet_('Settings');
   const v = sh.getDataRange().getDisplayValues();
   for (let i = 1; i < v.length; i++) {
@@ -957,13 +985,17 @@ function church_() {
     // What screens show: the church's own wording, or wording built from the website.
     messageLine: msgSet || (site ? 'Watch ' + site + ' and your email for updates.' : ''),
     noEvents: evSet || (site ? 'See all events at ' + site : 'Nothing on the calendar this week.'),
+    logoLink: String(st['Church Logo'] || '').trim(),
+    logo: logoImg_(st['Church Logo']),
+    wifiName: String(st['Wi-Fi Name'] || '').trim(),
+    wifiPass: String(st['Wi-Fi Password'] || ''),
   };
 }
 /** What screens and TVs need. */
 function churchForScreens_() {
   const c = church_();
   return { name: c.name, website: c.website, timeZone: c.timeZone, place: c.place, lat: c.lat, lon: c.lon, unit: c.unit,
-           messageLine: c.messageLine, noEvents: c.noEvents };
+           messageLine: c.messageLine, noEvents: c.noEvents, logo: c.logo, logoLink: c.logoLink };
 }
 
 /** Town or ZIP search for the weather spot (Open-Meteo's free geocoder, no key). */
@@ -1004,10 +1036,53 @@ function saveChurchSettings(o, token) {
     setSetting_('Temperature Unit', o.unit === 'C' ? 'C' : 'F');
     setSetting_('Message Line', String(o.messageLine || '').trim());
     setSetting_('No Events Text', String(o.noEvents || '').trim());
+    setSetting_('Wi-Fi Name', String(o.wifiName || '').trim());
+    setSetting_('Wi-Fi Password', String(o.wifiName || '').trim() ? String(o.wifiPass || '') : '');
     tzCache_ = null;
   } finally { lock.releaseLock(); }
   log_(me, 'Church settings', name);
   return church_();
+}
+
+const LOGO_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg' };
+/**
+ * The Church page's logo upload. Saved as "Church logo" in the slides root folder, shared by link so TVs and
+ * screens can load it, and replaces the previous church logo (which goes to Drive's trash).
+ */
+function uploadChurchLogo(fileName, mime, b64, token) {
+  const me = me_(data_(), token);
+  if (!needAdminOk_(me)) throw new Error('Only the Owner or an Admin can change church settings.');
+  if (!LOGO_TYPES[mime]) throw new Error('"' + fileName + '" isn\'t a PNG or JPG. A PNG with a see-through background looks best.');
+  const bytes = Utilities.base64Decode(b64);
+  if (bytes.length > 5 * 1024 * 1024) throw new Error('That logo is over 5 MB. Save a smaller copy (about 1000 pixels wide is plenty).');
+  return locked_(function () {
+    const f = slidesRoot_().createFile(Utilities.newBlob(bytes, mime, 'Church logo.' + LOGO_TYPES[mime]));
+    shareByLink_(f);
+    trashChurchLogo_();
+    setSetting_('Church Logo', 'https://drive.google.com/file/d/' + f.getId() + '/view');
+    log_(me, 'Church logo', fileName);
+    return church_();
+  });
+}
+function removeChurchLogo(token) {
+  const me = me_(data_(), token);
+  if (!needAdminOk_(me)) throw new Error('Only the Owner or an Admin can change church settings.');
+  return locked_(function () {
+    trashChurchLogo_();
+    setSetting_('Church Logo', '');
+    log_(me, 'Church logo', 'removed');
+    return church_();
+  });
+}
+/** Trashes the current church logo, only if it's one the Church page uploaded (in the slides root folder). */
+function trashChurchLogo_() {
+  const id = driveFileId_(settings_()['Church Logo']);
+  if (!id) return;
+  try {
+    const f = DriveApp.getFileById(id), rootId = folderId_(settings_()['Slides Root Folder']);
+    const parents = f.getParents();
+    while (parents.hasNext()) if (parents.next().getId() === rootId) { f.setTrashed(true); return; }
+  } catch (err) { /* already gone */ }
 }
 
 /** The Google account that deployed the app, if that's who is looking. Other visitors come back blank. */
@@ -1250,6 +1325,7 @@ function getState(iso, token) {
   return {
     me: me, perms: PERMS[me.role], t: t, url: ScriptApp.getService().getUrl(), church: st['Church Name'] || '',
     churchSettings: needAdminOk_(me) ? church_() : null, timeZone: tz_(),
+    churchDefaults: (function () { const c = church_(); return { logo: c.logo, wifiName: c.wifiName, wifiPass: c.wifiPass }; })(),
     users: can_(me, 'users') ? d.users.map(function (u) {
       return { email: u.Email, name: u.Name, role: u.Role, themes: split_(u.Themes, ','), devices: split_(u.Devices, ','),
                status: u.Status, invitedBy: u['Invited By'], invitedAt: u['Invited At'], lastSignIn: u['Last Sign-in'] };
@@ -1484,9 +1560,10 @@ function toProductionBatch_(d, t) {
             v['Default Mode'] || ''];
   });
   const themes = d.themes.map(function (th) {
-    return [th.Theme, th.Main, th.Accent, th['Display Name'] || th.Theme, th['Logo URL'] || '', th['Logo URL'] || '',
+    const logo = themeLogo_(th), wifi = themeWifi_(th);
+    return [th.Theme, th.Main, th.Accent, th['Display Name'] || th.Theme, logo, logo,
             th['Wayfinding Left'] || '', th['Wayfinding Right'] || '', th['QR Link'] || '', tvCalendar_(th.Calendar),
-            th['Wi-Fi Name'] || '', th['Wi-Fi Password'] || '', th['Calendar Hide'] || ''];
+            wifi.name, wifi.pass, th['Calendar Hide'] || ''];
   });
   // Each theme's slides folder doubles as a production "folder" of the same name.
   const folders = d.themes.map(function (th) { return [th.Theme, th['Slides Folder'] || '']; });

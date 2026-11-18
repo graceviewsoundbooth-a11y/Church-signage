@@ -59,6 +59,8 @@ data class LabSettings(
     val unit: String = "F",
     val messageLine: String = "",
     val noEvents: String = "",
+    /** The church logo's Drive link ("" = none). The TV downloads it like a theme logo. */
+    val logoLink: String = "",
 ) {
     /** Puts these into Config, where the screens, the schedule and the weather read them. */
     fun apply() {

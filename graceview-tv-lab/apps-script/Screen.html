@@ -190,6 +190,8 @@ function scrLive(s){
 }
 function scrMessage(s,clk){
   var c=clockParts(clk.mins);
+  // The church's own logo and name (Church page), not the theme's: an emergency is church-wide.
+  var ch=s.church||{},br={logo:ch.logo||s.theme.logo,display:ch.name||s.theme.display,name:ch.name||s.theme.name};
   var msg=String(s.message||''),size=msg.length>140?72:msg.length>80?96:120; // same steps as the TV app
   var warn='<svg viewBox="0 0 48 48" fill="none" stroke="#F2A900" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+
     '<path d="M24 5 44 41H4Z"/><path d="M24 19v10M24 35v1"/></svg>';
@@ -197,7 +199,7 @@ function scrMessage(s,clk){
     '<div class="hd">'+warn+'IMPORTANT UPDATE</div>'+
     '<div class="bd" style="font-size:'+size+'px">'+(esc(msg)||'&nbsp;')+'</div>'+
     (s.church&&s.church.messageLine?'<div class="sub">'+esc(s.church.messageLine)+'</div>':'')+'</div>'+
-    '<div class="ft"><div class="brand">'+logoHTML(s.theme)+(safeUrl(s.theme.logo)?'':esc(s.theme.display))+'</div><span>'+c.t+' '+c.ap+'</span></div></div>';
+    '<div class="ft"><div class="brand">'+logoHTML(br)+(safeUrl(br.logo)?'':esc(br.display))+'</div><span>'+c.t+' '+c.ap+'</span></div></div>';
 }
 function scrDash(s,clk){
   var c=clockParts(clk.mins),d=ymdParts(clk.ymd);

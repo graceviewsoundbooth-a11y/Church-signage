@@ -344,7 +344,7 @@ function specialForm(){
 }
 
 /* ---------- Themes ---------- */
-var THEME_FIELDS=[['Display Name','Name on screens'],['Logo URL','Logo link (https, optional)'],['Wayfinding Left','Left arrows, separated by ;'],['Wayfinding Right','Right arrows, separated by ;'],
+var THEME_FIELDS=[['Display Name','Name on screens'],['Logo URL','Logo (Drive link or https image, optional)'],['Wayfinding Left','Left arrows, separated by ;'],['Wayfinding Right','Right arrows, separated by ;'],
   ['QR Label','QR code label'],['QR Link','QR code link'],['Wi-Fi Name','Guest Wi-Fi name'],['Wi-Fi Password','Guest Wi-Fi password'],
   ['Calendar Hide','Hide calendar events containing (separate with ;)'],
   ['Slides Folder','Slides folder (Google Drive folder link)']];
@@ -488,16 +488,27 @@ function vThemes(){
   var list='<div class="themes-list">'+S.themes.map(function(t){return '<button data-act="pickTheme" data-t="'+esc(t.Theme)+'" class="'+(t.Theme===themeForm.Theme?'on':'')+'"><span class="sw" style="background:'+esc(safeColor(t.Main,'#666'))+'"></span><span class="sw" style="background:'+esc(safeColor(t.Accent,'#666'))+'"></span><span><b>'+esc(t.Theme)+'</b>'+(t.Theme===S.fallbackTheme?' <span class="chip">Fallback</span>':'')+'<br><span class="muted small">'+esc(t['Display Name'])+'</span></span></button>';}).join('')+'</div>'+(isAdmin()?(addingTheme?addThemeForm():'<button class="btn sm" data-act="addTheme">+ Add a theme</button>'):'');
   var f=themeForm;
   var colors='<div class="cpairs">'+COLOR_PAIRS.map(colorPair).join('')+'</div>';
-  var form='<div class="fgrid">'+THEME_FIELDS.map(function(x){return '<label class="f">'+x[1]+'<input type="text" data-f="th.'+x[0]+'" value="'+esc(f[x[0]]||'')+'"></label>';}).join('')+'</div>';
+  var form='<div class="fgrid">'+THEME_FIELDS.map(function(x){return '<label class="f">'+x[1]+'<input type="text" data-f="th.'+x[0]+'" value="'+esc(f[x[0]]||'')+'" placeholder="'+esc(themeFieldHint(x[0]))+'"></label>';}).join('')+'</div>';
   return '<section class="panel"><h2>Themes</h2><div class="twocol"><div style="display:flex;flex-direction:column;gap:14px">'+list+colors+form+
     calEditor()+'<div id="thCal">'+calNote()+'</div>'+folderNote(f.Theme)+themeAdminBox(f.Theme)+'<div class="row"><button class="btn pri" data-act="saveTheme">Save '+esc(f.Theme)+'</button><button class="btn" data-act="resetTheme">Undo changes</button></div></div>'+
     '<div><div class="muted small" style="margin-bottom:6px">Preview with wayfinding</div><div class="tvbox" id="thPrev">'+themePreview()+'</div>'+
     '<div class="muted small" style="margin:12px 0 6px">Preview without wayfinding</div><div class="tvbox" id="thPrev2">'+themePreview(true)+'</div></div></div></section>';
 }
+/* Church-wide defaults (Church page): a theme with no logo or guest Wi-Fi uses the church's, as on the TVs. */
+function CD(){return S.churchDefaults||{logo:'',wifiName:'',wifiPass:''};}
+function driveIdP(v){v=String(v||'').trim();var m=v.match(/\/d\/([A-Za-z0-9_-]{20,})/)||v.match(/[?&]id=([A-Za-z0-9_-]{20,})/)||v.match(/^([A-Za-z0-9_-]{25,})$/);return m?m[1]:'';}
+function themeLogoP(link){if(!String(link||'').trim())return CD().logo;var id=driveIdP(link);return id?'https://drive.google.com/thumbnail?id='+id+'&sz=w1000':link;}
+function themeFieldHint(k){
+  if(k==='Logo URL')return CD().logo?'Blank: the church logo':'Drive link or https image';
+  if(k==='Wi-Fi Name')return CD().wifiName?'Blank: '+CD().wifiName+' (church Wi-Fi)':'';
+  if(k==='Wi-Fi Password')return CD().wifiName?'Blank name above uses the church password':'';
+  return '';
+}
 function themeObjFromForm(f){
   var sp=function(s){return String(s||'').split(';').map(function(x){return x.trim();}).filter(String);};
-  return {name:f.Theme,display:f['Display Name']||f.Theme,main:f.Main,accent:f.Accent,logo:f['Logo URL'],wayL:sp(f['Wayfinding Left']),wayR:sp(f['Wayfinding Right']),
-    qrLabel:f['QR Label']||'Info',qrLink:f['QR Link'],wifiName:f['Wi-Fi Name'],wifiPass:f['Wi-Fi Password'],
+  return {name:f.Theme,display:f['Display Name']||f.Theme,main:f.Main,accent:f.Accent,logo:themeLogoP(f['Logo URL']),wayL:sp(f['Wayfinding Left']),wayR:sp(f['Wayfinding Right']),
+    qrLabel:f['QR Label']||'Info',qrLink:f['QR Link'],
+    wifiName:String(f['Wi-Fi Name']||'').trim()?f['Wi-Fi Name']:CD().wifiName,wifiPass:String(f['Wi-Fi Name']||'').trim()?f['Wi-Fi Password']:CD().wifiPass,
     mainText:f['Main Text']||'#FFFFFF',accentText:f['Accent Text']||'#FFFFFF'};
 }
 
@@ -913,7 +924,8 @@ var chForm=null, chPlaces=null;
 var COMMON_TZ=['America/New_York','America/Chicago','America/Denver','America/Phoenix','America/Los_Angeles','America/Anchorage','Pacific/Honolulu',
   'America/Puerto_Rico','America/Toronto','America/Vancouver','Europe/London','Australia/Sydney'];
 function chLoad(){var c=S.churchSettings||{};return {name:c.name||'',website:c.website||'',timeZone:c.timeZone||'America/Chicago',place:c.place||'',
-  lat:c.lat==null?'':c.lat,lon:c.lon==null?'':c.lon,unit:c.unit||'F',messageLine:c.messageLineSet||'',noEvents:c.noEventsSet||''};}
+  lat:c.lat==null?'':c.lat,lon:c.lon==null?'':c.lon,unit:c.unit||'F',messageLine:c.messageLineSet||'',noEvents:c.noEventsSet||'',
+  wifiName:c.wifiName||'',wifiPass:c.wifiPass||''};}
 function chSite(){return String(chForm.website||'').trim().replace(/^https?:\/\//i,'').replace(/\/+$/,'');}
 function chMsgDefault(){var s=chSite();return s?'Watch '+s+' and your email for updates.':'';}
 function chEvDefault(){var s=chSite();return s?'See all events at '+s:'Nothing on the calendar this week.';}
@@ -927,7 +939,7 @@ function chPreview(){
   var base=S.devices[0];if(!base)return '';
   var scr=JSON.parse(JSON.stringify(base.screen));
   scr.mode='Message';scr.message='Services are canceled today because of the weather.';
-  scr.church={timeZone:chForm.timeZone,messageLine:String(chForm.messageLine||'').trim()||chMsgDefault()};
+  scr.church={timeZone:chForm.timeZone,messageLine:String(chForm.messageLine||'').trim()||chMsgDefault(),name:chForm.name,logo:(S.churchSettings||{}).logo||''};
   return '<div class="muted small">How an Override Now message looks</div><div class="tvbox">'+renderScreen(scr,clk(),null,{qr:false})+'</div>';
 }
 function vChurch(){
@@ -938,6 +950,17 @@ function vChurch(){
   var h='<section class="panel"><h2>Church</h2><p class="muted small">Church-wide settings. TVs pick up changes within a minute.</p>'+
     '<div class="fgrid"><label class="f">Church name<input type="text" data-cf="name" value="'+esc(f.name)+'"></label>'+
     '<label class="f">Website<input type="text" data-cf="website" value="'+esc(f.website)+'" placeholder="yourchurch.org" spellcheck="false"></label></div></section>';
+
+  var lg=(S.churchSettings||{}).logo;
+  h+='<section class="panel"><h3>Logo and guest Wi-Fi</h3>'+
+    '<p class="muted small" style="margin:0 0 8px">Used by any theme that doesn’t have its own, and the logo is always on emergency messages.</p>'+
+    '<div class="row" style="align-items:center">'+(lg?'<span style="background:#14171C;padding:10px 14px;border-radius:8px;display:inline-flex"><img src="'+esc(lg)+'" alt="Church logo" style="max-height:64px;max-width:200px"></span>':'<span class="chip">No church logo</span>')+
+    '<label class="btn sm" style="cursor:pointer">'+(lg?'Replace logo':'Upload logo')+'<input type="file" id="chLogoFile" accept="image/png,image/jpeg" style="display:none"></label>'+
+    (lg?'<button class="btn sm danger" data-act="chLogoRemove">Remove</button>':'')+'</div>'+
+    '<p class="muted small" style="margin:6px 0 10px">PNG or JPG. A white or light logo on a see-through background shows best on the dark emergency screen and colored bars.</p>'+
+    '<div class="fgrid"><label class="f">Guest Wi-Fi name<input type="text" data-cf="wifiName" value="'+esc(f.wifiName)+'" placeholder="No guest Wi-Fi code"></label>'+
+    '<label class="f">Guest Wi-Fi password<input type="text" data-cf="wifiPass" value="'+esc(f.wifiPass)+'" placeholder="Leave blank for an open network"></label></div>'+
+    '<p class="muted small" style="margin:6px 0 0">Screens show a QR code that joins this network. It’s visible to anyone looking at the TV, so use the guest network only.</p></section>';
 
   h+='<section class="panel"><h3>Weather and time</h3>'+
     '<div class="small" style="margin-bottom:8px">Weather location: '+where+'</div>'+
@@ -1142,6 +1165,7 @@ var ACT={
     render();toast('Weather location: '+p.name+'.'+tzMsg+' Save to use it.');},
   chNoWeather:function(){chForm.place='';chForm.lat='';chForm.lon='';chPlaces=null;render();},
   chReset:function(){chForm=null;chPlaces=null;render();},
+  chLogoRemove:function(){call('removeChurchLogo',[],'Church logo removed');},
   chSave:function(){call('saveChurchSettings',[chForm],'Church settings saved',function(){chForm=null;chPlaces=null;});},
   grSave:function(){grCapture();call('saveGreenRoom',[{settings:grForm.settings,mics:grForm.mics}],'Green Room saved',function(){grForm=null;});},
 
@@ -1206,6 +1230,16 @@ function onChurchField(e){
 }
 document.addEventListener('input',onChurchField);
 document.addEventListener('change',onChurchField);
+/* Church logo: upload as soon as a file is picked. */
+document.addEventListener('change',function(e){
+  var el=e.target;if(!el||el.id!=='chLogoFile'||!el.files||!el.files[0])return;
+  var f=el.files[0];
+  if(!/^image\/(png|jpeg)$/.test(f.type)){toast('Pick a PNG or JPG.',true);el.value='';return;}
+  if(f.size>5*1024*1024){toast('That logo is over 5 MB. Save a smaller copy.',true);el.value='';return;}
+  var r=new FileReader();
+  r.onload=function(){call('uploadChurchLogo',[f.name,f.type,String(r.result).split(',')[1]],'Church logo saved');};
+  r.readAsDataURL(f);
+});
 document.addEventListener('input',function(e){
   var el=e.target;if(!el||!el.dataset||el.dataset.calsrc===undefined||!themeForm)return;
   var l=calList();l[+el.dataset.calsrc]=el.value.replace(/[;\r\n]+/g,' '); /* one calendar per box, even if a paste has ";" in it */themeForm.Calendar=l.map(function(x){return x.trim();}).join('; ');

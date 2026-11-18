@@ -49,6 +49,7 @@ fun GraceviewApp(vm: SignageViewModel) {
     val events by vm.events.collectAsState()
     val weather by vm.weather.collectAsState()
     val logos by vm.logos.collectAsState()
+    val churchLogo by vm.churchLogo.collectAsState()
     val applied by vm.applied.collectAsState()
     val showHome by vm.showHome.collectAsState()
     val allApps by vm.allAppsOpen.collectAsState()
@@ -124,7 +125,11 @@ fun GraceviewApp(vm: SignageViewModel) {
                         Mode.Fullscreen -> FullscreenScreen(theme, slides, hint)
                         Mode.Countdown -> CountdownScreen(theme, applied!!, slides, hint, darkLogo)
                         Mode.Live -> LiveScreen(theme, applied, feed, darkLogo, muted = sheet?.device(device)?.muteLive == true)
-                        Mode.Message -> MessageScreen(theme, applied?.message.orEmpty(), darkLogo)
+                        // An emergency is church-wide: the church's logo and name (Church page), not the theme's.
+                        Mode.Message -> MessageScreen(
+                            if (church.isNotBlank()) theme.copy(displayName = church) else theme,
+                            applied?.message.orEmpty(), churchLogo ?: darkLogo,
+                        )
                         Mode.Off -> if (manualSignage) {
                             SignageScreen(dev.withWayfinding(theme), res.folderName, res.folderId != null, slides, events, weather, logos.first, logos.second)
                         } else BlackScreen()

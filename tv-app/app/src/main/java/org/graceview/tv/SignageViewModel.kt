@@ -80,6 +80,9 @@ class SignageViewModel(app: Application) : AndroidViewModel(app) {
     val events = MutableStateFlow<List<CalEvent>?>(null)
     val weather = MutableStateFlow<Weather?>(null)
     val logos = MutableStateFlow<Pair<File?, File?>>(null to null)
+    /** The church logo from the dashboard's Church page (emergency messages). null = none, or not loaded yet. */
+    val churchLogo = MutableStateFlow<File?>(null)
+    private var churchLogoLink = ""
 
     // ---- Schedule and navigation state ----
     /** The schedule state on screen. Changes only at transitions. */
@@ -464,6 +467,10 @@ class SignageViewModel(app: Application) : AndroidViewModel(app) {
                     val before = weatherKey()
                     s.apply()
                     if (weatherKey() != before) weatherChanged.trySend(Unit) // new spot or unit: fetch now
+                    if (s.logoLink != churchLogoLink || (s.logoLink.isNotBlank() && churchLogo.value == null)) {
+                        churchLogoLink = s.logoLink
+                        churchLogo.value = s.logoLink.takeIf { it.isNotBlank() }?.let { LogoCache.get(ctx.filesDir, it) }
+                    }
                 }
                 if (st.files.isNotEmpty()) LabFolders.listings = st.files
                 st.batch?.let { sheet.value = sheetRepo.store(it) }

@@ -89,6 +89,8 @@ On **Green Room**: the **Planning Center login** (personal access token: Applica
 On **Church** (Owner and Admin), the church-wide settings, stored on the Settings tab:
 
 - **Church name** and **website** (e.g. `graceview.org`).
+- **Logo:** upload a PNG or JPG (saved as "Church logo" in the slides folder, shared by link; replacing it trashes the old one). It's on every emergency message, and any theme with no logo of its own uses it.
+- **Guest Wi-Fi:** name and password for the Wi-Fi QR code on any theme with no Wi-Fi of its own. A theme's own logo or Wi-Fi always wins; the theme editor shows the church default in gray.
 - **Weather location:** search a town or ZIP code (Open-Meteo's free place search, no key) and pick it. This also sets the time zone. You can rename the label shown next to the temperature. **No weather** leaves the weather spot empty. Choose **°F or °C**.
 - **Time zone:** schedules, clocks and calendar times all use it.
 - **Wording on the screens:** the line under an Override Now message and the This Week text when the calendar is empty. Leave them blank to use wording built from the website ("Watch graceview.org and your email for updates.", "See all events at graceview.org"). A preview shows the emergency message.
