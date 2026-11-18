@@ -353,7 +353,8 @@ var THEME_FIELDS=[['Display Name','Name on screens'],['Logo URL','Logo link (htt
  * than 3 events in the next 7 days, the fallbacks top This Week up to 4, in order (same rule as the TV app).
  */
 var calCheck=null;
-function calList(){var v=String(themeForm.Calendar||'');var l=v.split(/;|\n/).map(function(x){return x.trim();});return v.trim()?l:[''];}
+var CAL_MAX=8; // calendars per theme, same cap as the server
+function calList(){var v=String(themeForm.Calendar||'');var l=v.split(/;|\n/).map(function(x){return x.trim();}).slice(0,CAL_MAX);return v.trim()?l:[''];}
 function calSet(list){themeForm.Calendar=list.map(function(x){return x.trim();}).filter(function(x,i){return x||i===0;}).join('; ');}
 function calSaved(){return (S.themes.filter(function(t){return t.Theme===themeForm.Theme;})[0]||{}).Calendar||'';}
 /* Status for the calendars as written now: a fresh Check-all result, or the saved status if unchanged. */
@@ -965,7 +966,7 @@ var ACT={
       .withFailureHandler(function(e){themeDel=null;fail(e);}).themeUsage(t,TOKEN);
   },
   themeDelCancel:function(){themeDel=null;render();},
-  calAdd:function(){var l=calList();l.push('');themeForm.Calendar=l.join('; ');render();var e=document.getElementById('calSrc'+(l.length-1));if(e)e.focus();},
+  calAdd:function(){var l=calList();if(l.length>=CAL_MAX){toast('Up to '+CAL_MAX+' calendars per theme.',true);return;}l.push('');themeForm.Calendar=l.join('; ');render();var e=document.getElementById('calSrc'+(l.length-1));if(e)e.focus();},
   calRemove:function(b){var l=calList();l.splice(+b.dataset.i,1);calSet(l.length?l:['']);render();},
   calMove:function(b){var l=calList(),i=+b.dataset.i,j=i+(+b.dataset.d);if(j<0||j>=l.length)return;var x=l[i];l[i]=l[j];l[j]=x;calSet(l);render();},
   calCheckAll:function(){
@@ -1124,7 +1125,7 @@ function onField(e){
 document.addEventListener('input',onField);
 document.addEventListener('input',function(e){
   var el=e.target;if(!el||!el.dataset||el.dataset.calsrc===undefined||!themeForm)return;
-  var l=calList();l[+el.dataset.calsrc]=el.value;themeForm.Calendar=l.map(function(x){return x.trim();}).join('; ');
+  var l=calList();l[+el.dataset.calsrc]=el.value.replace(/[;\r\n]+/g,' '); // one calendar per box, even if a paste has ";" in itthemeForm.Calendar=l.map(function(x){return x.trim();}).join('; ');
   var st=document.getElementById('calStat'+el.dataset.calsrc);if(st)st.innerHTML='';
   var n=document.getElementById('thCal');if(n)n.innerHTML=calNote();
 });

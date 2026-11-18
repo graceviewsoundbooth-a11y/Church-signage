@@ -514,6 +514,7 @@ function eventsFor_(th, t) { return calendar_(th, t).events; }
 
 const CAL_MIN_EVENTS = 3;
 const CAL_FILL_TO = 4;
+const CAL_MAX = 8;   // calendars per theme; any after these are ignored
 
 /** The calendars in a Calendar cell, in order. Each is a fetchable https link, or null if it isn't valid. */
 function calUrls_(src) {
@@ -596,8 +597,8 @@ function calendar_(th, t, checkAll) {
     if (hide.some(function (h) { return title.indexOf(h) >= 0; })) return false;
     return !(e.ymd === t.ymd && !e.allDay && e.endMins <= t.mins); // already over today
   };
-  const raw = split_(src, /;|\n/);
-  const urls = calUrls_(src);
+  const raw = split_(src, /;|\n/).slice(0, CAL_MAX);
+  const urls = calUrls_(src).slice(0, CAL_MAX);
   const sources = [], lists = [], listOf = [];
   let have = 0;
   urls.forEach(function (url, i) {
@@ -1405,7 +1406,7 @@ function toProductionBatch_(d, t) {
  * applies the same main-then-fallbacks rule. Invalid entries are left out.
  */
 function tvCalendar_(src) {
-  return calUrls_(src || '').filter(function (u) { return !!u; }).join('; ');
+  return calUrls_(src || '').slice(0, CAL_MAX).filter(function (u) { return !!u; }).join('; ');
 }
 
 function getTv(deviceKey) {
