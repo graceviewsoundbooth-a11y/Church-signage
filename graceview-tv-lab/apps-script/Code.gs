@@ -335,7 +335,7 @@ function folderFiles_(th, fresh) {
     console.error('Slides folder ' + id + ': ' + why);
     out = { linked: true, files: [], error: /permission|authori[sz]/i.test(why)
       ? 'Google Drive access hasn\'t been approved for this app yet. (' + why + ')'
-      : 'The slides folder couldn\'t be opened. Check the link on the Themes page, and that you have access to the folder. (' + why + ')' };
+      : 'The slides folder couldn\'t be opened. Check the link under Content > Look & details, and that you have access to the folder. (' + why + ')' };
   }
   return out;
 }
@@ -434,7 +434,7 @@ function slideFolderFor_(d, me, theme) {
   need_(me, 'slides', theme);
   const th = themeRow_(d, theme);
   const id = folderId_(th['Slides Folder']);
-  if (!id) throw new Error('The ' + theme + ' theme has no slides folder yet. Add one on the Themes page.');
+  if (!id) throw new Error('The ' + theme + ' theme has no slides folder yet. Add one under Content > Look & details.');
   return { th: th, id: id, folder: DriveApp.getFolderById(id) };
 }
 

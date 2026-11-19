@@ -2,6 +2,17 @@
 
 The lab is the dashboard for **Church Signage**: a web control panel that replaces the Google Sheet as the way people run the TVs. It has its own Sheet ("Graceview TV Lab") and Drive folders, and the TVs are either the native Church Signage app (`../tv-app`) or browser screens. Nothing here touches the live Graceview TV Sheet, Drive folders, TVs or the vMix PC.
 
+## The dashboard
+
+Four sections, plus the red **Override** button at the top:
+
+- **Screens:** **Now showing** has a live preview of every screen with Edit and Override ("See a different time" previews any moment); **Manage screens** lists them with status, IP and app version. **+ Add a screen** pairs one.
+- **Schedule:** weekly rows and special dates.
+- **Content:** **Slides** (uploads per theme) and **Look & details** (theme colors, logo, wayfinding, QR, Wi-Fi, calendars). Staff see Slides only.
+- **Settings:** Church, People, Home screens, Green Room, Recent activity, Your account.
+
+On a phone the sections become a bar at the bottom. The corner button switches light and dark.
+
 ## What's in it
 
 | Piece | What it does |
@@ -46,7 +57,7 @@ On **Settings → People**, choose **Invite someone**, pick a role and send the 
 
 ## TVs
 
-**Pairing:** a TV shows a 6-character code (the Church Signage app on a stick, or a browser at the Web app URL with `?screen`). On **Devices** (or **Now**), choose **Pair a TV**, type the code, and pick the TV or add a new one. It switches over within a few seconds and stays paired. Codes refresh every 15 minutes.
+**Pairing:** a TV shows a 6-character code (the Church Signage app on a stick, or a browser at the Web app URL with `?screen`). On **Screens**, choose **+ Add a screen**, type the code, and pick the screen or add a new one. It switches over within a few seconds and stays paired. Codes refresh every 15 minutes.
 
 **Devices page:** every TV with its location, kind of screen, theme, launcher, what it's showing now, **Online** (checked in within 3 minutes) or last seen, and the IP address, model and app version the TV reports. Admins can **Edit** (renaming also updates schedule rows, overrides, presets and Limited users that name the TV), **Unpair** or **Remove** a TV. **Preview** shows what a TV shows (signed-in people only; add `&at=2026-11-22T10:45` to preview a time).
 
@@ -56,7 +67,7 @@ On **Settings → People**, choose **Invite someone**, pick a role and send the 
 
 ## Schedule and overrides
 
-The same rules as the live system: **Override** beats **Special Dates**, which beat **Weekly**; with nothing scheduled, each TV uses its default. **Override** has ready-made presets and can end on its own. **Schedule** shows the week as a grid and flags rows a higher row hides.
+The same rules as the live system: **Override** beats **Special Dates**, which beat **Weekly**; with nothing scheduled, each TV uses its default. **Override** (the red button at the top, always there) has ready-made presets and can end on its own; while one runs the button turns solid red. **Schedule** shows the week as a grid and flags rows a higher row hides.
 
 ## Themes
 
@@ -71,22 +82,22 @@ The same rules as the live system: **Override** beats **Special Dates**, which b
 
 Slides are uploaded files only (JPG, PNG, MP4). Each theme has a folder in Drive, shared "anyone with the link can view" so every TV can load it.
 
-- Add files on the **Slides** page (drag and drop, up to 45 MB) or straight into the Drive folder. TVs pick them up within about a minute.
+- Add files under **Content → Slides** (drag and drop, up to 45 MB) or straight into the Drive folder. TVs pick them up within about a minute.
 - **Order** is the file name (`01 Welcome.jpg`); the ↑ ↓ buttons renumber. **Dates** are tags in the name: `[from 12-01]`, `[until 2026-12-24]`; the date boxes write them. **`[full]`** plays a whole video (up to 3 minutes).
 - **Delete** moves the file to Drive's trash (restorable for 30 days).
 - A folder linked by hand that isn't shared shows a warning with a **Make viewable by link** button.
 
 ## Launchers
 
-A launcher is the home screen people see when they leave the slides (or all the time on a classroom TV). On **Launchers**, pick tiles and their order: built-ins (Watch Live, Return to Signage, Announcements, Green Room Dashboard, Screen Mirror, HDMI, YouTube, Web Browser, Get Apps, All Apps, Settings), **any app** (TVs report their installed apps every hour) or **a website**. Choose which TVs use it and how long a signage TV waits idle before going back. TVs leave out tiles that don't apply there. Website tiles need a browser app on the TV; stock Google TV has none.
+A launcher is the home screen people see when they leave the slides (or all the time on a classroom TV). On **Settings → Home screens**, pick tiles and their order: built-ins (Watch Live, Return to Signage, Announcements, Green Room Dashboard, Screen Mirror, HDMI, YouTube, Web Browser, Get Apps, All Apps, Settings), **any app** (TVs report their installed apps every hour) or **a website**. Choose which TVs use it and how long a signage TV waits idle before going back. TVs leave out tiles that don't apply there. Website tiles need a browser app on the TV; stock Google TV has none.
 
 ## Green Room
 
-On **Green Room**: the **Planning Center login** (personal access token: Application ID and Secret; shown only as "Saved, ID …abcd" and sent only to Green Room TVs, which store it encrypted), the service type, mic assignment source, ProPresenter address and timer, Avantis address and MIDI channel, and the **mic map**. **Connections** shows whether each Green Room TV reaches Planning Center, ProPresenter and the Avantis (reported while its dashboard is open). ProPresenter and the Avantis are read-only and only reachable from the church network. The addresses in the lab are stand-ins.
+On **Settings → Green Room**: the **Planning Center login** (personal access token: Application ID and Secret; shown only as "Saved, ID …abcd" and sent only to Green Room TVs, which store it encrypted), the service type, mic assignment source, ProPresenter address and timer, Avantis address and MIDI channel, and the **mic map**. **Connections** shows whether each Green Room TV reaches Planning Center, ProPresenter and the Avantis (reported while its dashboard is open). ProPresenter and the Avantis are read-only and only reachable from the church network. The addresses in the lab are stand-ins.
 
 ## Church
 
-On **Settings → Church** (Owner and Admin), the church-wide settings, stored on the Sheet's Settings tab. **Settings** also holds **People**, **Recent activity** and **Your account** (password); each person sees only the tabs their role allows.
+On **Settings → Church** (Owner and Admin), the church-wide settings, stored on the Sheet's Settings tab. **Settings** also holds **People**, **Home screens**, **Green Room**, **Recent activity** and **Your account** (password); each person sees only the tabs their role allows.
 
 - **Church name** and **website** (e.g. `graceview.org`).
 - **Logo:** upload a PNG or JPG (saved as "Church logo" in the slides folder, shared by link; replacing it trashes the old one). It's on every emergency message, and any theme with no logo of its own uses it.

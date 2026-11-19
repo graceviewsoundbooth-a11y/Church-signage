@@ -44,9 +44,35 @@ button,input,select,textarea{font:inherit;color:inherit}
 .who{font-size:14px;color:var(--muted);text-align:right}
 .who b{color:var(--fg)}
 nav{display:flex;gap:4px;overflow-x:auto;padding:8px max(16px,env(safe-area-inset-left));background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
-nav button{border:0;background:none;padding:8px 14px;border-radius:8px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+nav button{border:0;background:none;padding:8px 14px;border-radius:8px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:8px}
+nav button svg{width:18px;height:18px;flex:none}
 nav button.on{background:var(--sunk);color:var(--fg)}
-nav button.navset{margin-left:auto}
+.ovbtn{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--bad);color:var(--bad);background:var(--surface);border-radius:999px;padding:6px 14px;font-weight:700;cursor:pointer;white-space:nowrap}
+.ovbtn svg{width:18px;height:18px}
+.ovbtn:hover,.ovbtn.cur{background:color-mix(in srgb,var(--bad) 10%,var(--surface))}
+.ovbtn.on{background:var(--bad);color:#fff}
+.ovbtn[hidden]{display:none}
+details.timepick>summary{cursor:pointer;font-weight:600;list-style:none;display:flex;align-items:center;gap:8px}
+details.timepick>summary::-webkit-details-marker{display:none}
+details.timepick>summary::before{content:'';width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+details.timepick[open]>summary::before{transform:rotate(45deg)}
+/* Phones: the four sections become a bar at the bottom; Override stays in the header. */
+@media (max-width:700px){
+  nav{position:fixed;top:auto;bottom:0;left:0;right:0;justify-content:space-around;border-bottom:0;border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom));gap:0}
+  nav button{flex-direction:column;gap:3px;font-size:12px;padding:6px 8px;flex:1;min-width:0}
+  nav button svg{width:22px;height:22px}
+  main{padding-bottom:110px}
+  /* Header: logo (or name), Override and the color button. Your account is under Settings. */
+  .top{padding-top:10px;padding-bottom:10px}
+  .who{display:none}
+  .brand{min-width:0}
+  .brand .mkimg+h1{display:none}
+  .brand h1{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .brand .lab{display:none}
+  .ovbtn{padding:6px 12px}
+  details.timepick>summary .muted{display:none}
+  #toast{bottom:84px}
+}
 .subnav{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 14px;border-bottom:1px solid var(--line)}
 .subnav button{border:0;background:none;padding:8px 12px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
 .subnav button.on{color:var(--fg);border-bottom-color:var(--fg)}
@@ -141,7 +167,7 @@ tr.flag td:first-child{box-shadow:inset 4px 0 var(--warn)}
 <div id="busy"></div>
 <header class="top">
   <div class="brand" id="brand"><div class="mk">S</div><h1>Church Signage</h1><span class="lab">Lab</span></div>
-  <div class="topr"><button class="modebtn" id="modeBtn" data-act="colorMode" type="button"></button><div class="who" id="who">Loading…</div></div>
+  <div class="topr"><button id="ovBtn" class="ovbtn" data-act="view" data-v="override" type="button" hidden></button><button class="modebtn" id="modeBtn" data-act="colorMode" type="button"></button><div class="who" id="who">Loading…</div></div>
 </header>
 <nav id="nav" aria-label="Sections"></nav>
 <main id="main"><div class="panel">Loading the Sheet…</div></main>
@@ -152,11 +178,27 @@ tr.flag td:first-child{box-shadow:inset 4px 0 var(--warn)}
 var S=null, view='now', preview='', edit=null, pendingDelete=null, schedFilter='all';
 var themeForm=null, slideTheme=null, ov=null, ovConfirm=false;
 var DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-var VIEWS=[['now','Now',null],['devices','Devices',null],['override','Override','override'],['schedule','Schedule','schedule'],['themes','Themes','theme'],['slides','Slides','slides'],
-  ['launchers','Launchers','launchers'],['greenroom','Green Room','greenroom']];
-/* Settings: one menu item, with its own tabs. Each tab shows only to people allowed to use it. */
-var SETTINGS=[['church','Church','users'],['people','People','users'],['activity','Recent activity','activity'],['account','Your account',null]];
-var settingsLast='';
+/*
+ * The menu: four sections, each with its own tabs ([view, label, permission]). A section shows if any of its
+ * tabs is allowed; its tab row shows when more than one is. Override isn't a section: it's the red button
+ * in the header, always one tap away.
+ */
+var GROUPS=[
+  {id:'screens',label:'Screens',icon:'screens',tabs:[['now','Now showing',null],['devices','Manage screens',null]]},
+  {id:'schedule',label:'Schedule',icon:'schedule',tabs:[['schedule','Schedule','schedule']]},
+  {id:'content',label:'Content',icon:'content',tabs:[['slides','Slides','slides'],['themes','Look & details','theme']]},
+  {id:'settings',label:'Settings',icon:'settings',tabs:[['church','Church','users'],['people','People','users'],['launchers','Home screens','launchers'],
+    ['greenroom','Green Room','greenroom'],['activity','Recent activity','activity'],['account','Your account',null]]}];
+var groupLast={};
+var NAV_ICON={
+  screens:'<path d="M3 5h18v11H3z"/><path d="M8 20h8M12 16v4"/>',
+  schedule:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  content:'<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 15l5-5 4 4 3-3 6 6"/><circle cx="15.5" cy="8.5" r="1.5"/>',
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'};
+/* Allowed tabs of a section, and the section a view belongs to. */
+function groupTabs(g){return g.tabs.filter(function(t){return can(t[2]);});}
+function groupOf(v){for(var i=0;i<GROUPS.length;i++)if(GROUPS[i].tabs.some(function(t){return t[0]===v;}))return GROUPS[i];return null;}
+function allowedView(v){if(v==='override')return can('override');var g=groupOf(v);return !!g&&groupTabs(g).some(function(t){return t[0]===v;});}
 var P=JSON.parse(document.getElementById('params').textContent||'{}');
 var INVITE=P.invite||'', INV=null, userEdit=null, newLink=null;
 
@@ -200,20 +242,30 @@ function render(){
   drawBrand();drawModeBtn();
   if(INVITE){who.innerHTML='';nav.innerHTML='';m.innerHTML=vInvite();return;}
   if(S.state){
-    who.innerHTML='';nav.innerHTML='';
+    who.innerHTML='';nav.innerHTML='';drawOvBtn();
     m.innerHTML=S.state==='Setup'?vSetup():S.state==='SignIn'?vSignIn():vNotReady();
     return;
   }
   who.innerHTML='<button class="whobtn" data-act="view" data-v="account" title="Your account"><b>'+esc(S.me.name)+'</b><br>'+esc(S.me.role)+(S.me.role==='Limited'?' · '+esc(S.me.themes.join(', ')):'')+'</button>';
-  var allowed=VIEWS.filter(function(v){return can(v[2]);}),sets=SETTINGS.filter(function(v){return can(v[2]);});
-  var inSettings=sets.some(function(v){return v[0]===view;});
-  if(!inSettings&&!allowed.some(function(v){return v[0]===view;}))view='now';
-  if(inSettings)settingsLast=view;
-  var setTo=sets.some(function(v){return v[0]===settingsLast;})?settingsLast:sets[0][0];
-  nav.innerHTML=allowed.map(function(v){return '<button data-act="view" data-v="'+v[0]+'" class="'+(v[0]===view?'on':'')+'">'+v[1]+'</button>';}).join('')+
-    '<button data-act="view" data-v="'+setTo+'" class="navset'+(inSettings?' on':'')+'">Settings</button>';
-  m.innerHTML=overrideBanner()+(inSettings?'<div class="subnav" role="tablist">'+sets.map(function(v){return '<button role="tab" aria-selected="'+(v[0]===view)+'" data-act="view" data-v="'+v[0]+'" class="'+(v[0]===view?'on':'')+'">'+v[1]+'</button>';}).join('')+'</div>':'')+({now:vNow,devices:vDevices,override:vOverride,schedule:vSchedule,themes:vThemes,slides:vSlides,activity:vActivity,launchers:vLaunchers,greenroom:vGreenRoom,people:vPeople,church:vChurch,account:vAccount}[view])();
+  if(!allowedView(view))view='now';
+  var cur=groupOf(view);if(cur)groupLast[cur.id]=view;
+  drawOvBtn();
+  nav.innerHTML=GROUPS.filter(function(g){return groupTabs(g).length;}).map(function(g){
+    var tabs=groupTabs(g),to=tabs.some(function(t){return t[0]===groupLast[g.id];})?groupLast[g.id]:tabs[0][0],on=cur===g;
+    return '<button data-act="view" data-v="'+to+'" class="'+(on?'on':'')+'"'+(on?' aria-current="page"':'')+'><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+NAV_ICON[g.icon]+'</svg><span>'+g.label+'</span></button>';
+  }).join('');
+  var tabs=cur?groupTabs(cur):[];
+  m.innerHTML=overrideBanner()+(tabs.length>1?'<div class="subnav" role="tablist">'+tabs.map(function(v){return '<button role="tab" aria-selected="'+(v[0]===view)+'" data-act="view" data-v="'+v[0]+'" class="'+(v[0]===view?'on':'')+'">'+v[1]+'</button>';}).join('')+'</div>':'')+({now:vNow,devices:vDevices,override:vOverride,schedule:vSchedule,themes:vThemes,slides:vSlides,activity:vActivity,launchers:vLaunchers,greenroom:vGreenRoom,people:vPeople,church:vChurch,account:vAccount}[view])();
   fitScreens(m);
+}
+/* The header's Override button: red outline normally, solid red while an override is on. */
+function drawOvBtn(){
+  var b=document.getElementById('ovBtn');if(!b)return;
+  if(!S||S.state||!can('override')){b.hidden=true;return;}
+  var active=S.override&&S.override.Active==='TRUE';
+  b.hidden=false;b.className='ovbtn'+(active?' on':'')+(view==='override'?' cur':'');
+  b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 22 20H2Z"/><path d="M12 10v4M12 17v.5"/></svg><span>'+(active?'Override on':'Override')+'</span>';
+  b.title=active?'An override is running. Open it to change or end it.':'Show a message or something else on screens right now, over every schedule';
 }
 function overrideBanner(){
   var o=S.override;if(o.Active!=='TRUE'||view==='override')return '';
@@ -226,16 +278,21 @@ function timeBar(){
   var td=S.t.today,ps=[
     ['Sunday 9:45 AM',nextDow(td,0)+'T09:45'],['Sunday 10:45 AM',nextDow(td,0)+'T10:45'],['Wednesday 4:30 PM',nextDow(td,3)+'T16:30'],
     ['Thanksgiving',td.slice(0,4)+'-11-26T10:00'],['Christmas Eve 4 PM',td.slice(0,4)+'-12-24T16:00'],['Saturday 11 PM',nextDow(td,6)+'T23:00']];
-  return '<section class="panel"><div class="timebar"><div class="now'+(S.t.preview?' pv':'')+'">'+(S.t.preview?'Previewing ':'Live now: ')+esc(niceStamp(S.t))+'</div>'+
-    (S.t.preview?'<button class="btn sm" data-act="at" data-at="">Back to live</button>':'')+'</div>'+
+  return '<details class="panel timepick"'+(S.t.preview?' open':'')+'><summary><span class="now'+(S.t.preview?' pv':'')+'" style="'+(S.t.preview?'color:var(--info)':'')+'">'+(S.t.preview?'Previewing ':'Showing now · ')+esc(niceStamp(S.t))+'</span><span class="muted small" style="font-weight:400">'+(S.t.preview?'':'See a different time')+'</span></summary>'+
+    (S.t.preview?'<div class="row"><button class="btn sm" data-act="at" data-at="">Back to now</button></div>':'')+
     '<div class="row">'+ps.map(function(p){return '<button class="tog'+(preview===p[1]?' on':'')+'" data-act="at" data-at="'+p[1]+'">'+p[0]+'</button>';}).join('')+'</div>'+
     '<div class="row"><input type="date" id="pvDate" value="'+S.t.ymd+'" style="width:auto"><input type="time" id="pvTime" value="'+String(Math.floor(S.t.mins/60)).padStart(2,'0')+':'+String(S.t.mins%60).padStart(2,'0')+'" style="width:auto">'+
-    '<button class="btn sm" data-act="atCustom">Preview this time</button><span class="muted small">Previews don\'t change anything. They show what each TV would show.</span></div></section>';
+    '<button class="btn sm" data-act="atCustom">Preview this time</button><span class="muted small">Previews don\'t change anything. They show what each screen would show.</span></div></details>';
+}
+function screensHead(){
+  var on=S.devices.filter(function(d){return d.now.mode!=='Off';}).length,online=S.devices.filter(function(d){return d.online;}).length;
+  return '<div class="row" style="justify-content:space-between"><div class="muted">'+on+' of '+S.devices.length+' screen'+(S.devices.length===1?'':'s')+' showing something · '+online+' online'+
+    (S.conflicts.length&&can('schedule')?' · <a href="#" data-act="view" data-v="schedule">'+S.conflicts.length+' schedule overlap'+(S.conflicts.length>1?'s':'')+'</a>':'')+'</div>'+
+    (isAdmin()&&!pairForm?'<button class="btn pri" data-act="pairOpen">+ Add a screen</button>':'')+'</div>';
 }
 function vNow(){
-  var on=S.devices.filter(function(d){return d.now.mode!=='Off';}).length;
-  return timeBar()+(pairForm?vPairForm():'')+'<div class="row" style="justify-content:space-between"><div class="muted">'+on+' of '+S.devices.length+' TVs showing something'+(S.conflicts.length?' · <a href="#" data-act="view" data-v="schedule">'+S.conflicts.length+' schedule overlap'+(S.conflicts.length>1?'s':'')+'</a>':'')+'</div>'+(isAdmin()&&!pairForm?'<button class="btn pri" data-act="pairOpen">Pair a TV</button>':'')+'</div>'+
-    '<div class="grid">'+S.devices.map(card).join('')+'</div>';
+  return (pairForm?vPairForm():'')+(devEdit?devForm():'')+screensHead()+timeBar()+
+    '<div class="grid">'+S.devices.map(card).join('')+'</div>'+(S.devices.length?'':'<p class="muted">No screens yet.'+(isAdmin()?' Use Add a screen to pair a TV or a computer.':'')+'</p>');
 }
 function card(d){
   var src=d.now.source==='Special Date'?'Special':d.now.source;
@@ -244,9 +301,9 @@ function card(d){
     '<div class="ch"><h3>'+esc(d.name)+'</h3><span class="chip '+esc(src)+'">'+esc(d.now.mode)+'</span></div>'+
     '<p class="why">'+esc(d.now.label)+'</p>'+
     '<p class="meta">'+esc(d.screen.theme.name)+' theme · '+esc(d.profile)+'</p>'+
-    '<p class="meta"><span class="dot'+(d.pairedAt?' ok':'')+'"></span>'+(d.pairedAt?'Paired '+esc(d.pairedAt)+(d.lastSeen?' · last checked in '+esc(d.lastSeen):''):'No screen paired')+'</p>'+
-    '<div class="acts"><a class="btn sm" href="'+esc(link)+'" target="_blank" rel="noopener" title="See what this TV shows. Previews never count as the TV checking in.">Preview</a>'+
-    (isAdmin()&&d.pairedAt?(pendingDelete==='tv:'+d.id?'<button class="btn sm danger" data-act="unpairGo" data-id="'+esc(d.id)+'">Confirm unpair</button>':'<button class="btn sm" data-act="unpairAsk" data-id="'+esc(d.id)+'">Unpair</button>'):'')+
+    '<p class="meta"><span class="dot'+(d.online?' ok':'')+'"></span>'+(!d.pairedAt?'Not paired yet':d.online?'Online':'Offline'+(d.lastSeen?' · last seen '+esc(d.lastSeen):''))+(d.location?' · '+esc(d.location):'')+'</p>'+
+    '<div class="acts"><a class="btn sm" href="'+esc(link)+'" target="_blank" rel="noopener" title="Open this screen full size. Previews never count as the screen checking in.">Full size</a>'+
+    (isAdmin()?'<button class="btn sm" data-act="devEditOpen" data-id="'+esc(d.id)+'">Edit</button>':'')+
     (can('override')?'<button class="btn sm" data-act="ovFor" data-name="'+esc(d.name)+'">Override</button>':'')+'</div></div></article>';
 }
 
@@ -257,7 +314,7 @@ function ovAffected(){var t=ovDevices();return S.allDevices.filter(function(d){r
 function ovPreview(){
   var aff=ovAffected(),base=null;
   for(var i=0;i<S.devices.length&&!base;i++)if(aff.some(function(a){return a.id===S.devices[i].id;}))base=S.devices[i];
-  if(!base)return '<p class="muted">Pick a TV to see a preview.</p>';
+  if(!base)return '<p class="muted">Pick a screen to see a preview.</p>';
   var th=S.themeObjs.filter(function(x){return x.name===ov.theme;})[0]||base.screen.theme;
   var scr=JSON.parse(JSON.stringify(base.screen));
   scr.mode=ov.mode;scr.message=ov.message||'Your message shows here.';scr.theme=th;
@@ -275,16 +332,16 @@ function vOverride(){
   var chips=['ALL','ALL SIGNAGE','CLASSROOMS'].concat(S.allDevices.map(function(d){return d.name;}));
   var aff=ovAffected();
   h+='<section class="panel"><h2>'+(active?'Replace the override':'Start an override')+'</h2>'+
-    '<p class="muted small">An override wins over every schedule until it ends. Virtual TVs pick it up within 15 seconds.</p>'+
+    '<p class="muted small">An override wins over every schedule until it ends. Screens pick it up within 15 seconds.</p>'+
     (S.presets.length?'<div><div class="small" style="font-weight:600;margin-bottom:6px">Ready-made</div><div class="row">'+S.presets.map(function(p,i){return '<button class="btn sm" data-act="preset" data-i="'+i+'">'+esc(p.Name)+'</button>';}).join('')+'</div></div>':'')+
-    '<div><div class="small" style="font-weight:600;margin-bottom:6px">Which TVs</div><div class="row">'+chips.map(function(c){return '<button class="tog'+(ov.targets.indexOf(c)>=0?' on':'')+'" data-act="ovTarget" data-t="'+esc(c)+'" aria-pressed="'+(ov.targets.indexOf(c)>=0)+'">'+esc(c)+'</button>';}).join('')+'</div>'+
-    '<div class="muted small" style="margin-top:6px">'+(aff.length?aff.length+' TV'+(aff.length>1?'s':'')+': '+esc(aff.map(function(a){return a.name;}).join(', ')):'No TVs picked')+'</div></div>'+
+    '<div><div class="small" style="font-weight:600;margin-bottom:6px">Which screens</div><div class="row">'+chips.map(function(c){return '<button class="tog'+(ov.targets.indexOf(c)>=0?' on':'')+'" data-act="ovTarget" data-t="'+esc(c)+'" aria-pressed="'+(ov.targets.indexOf(c)>=0)+'">'+esc(c)+'</button>';}).join('')+'</div>'+
+    '<div class="muted small" style="margin-top:6px">'+(aff.length?aff.length+' screen'+(aff.length>1?'s':'')+': '+esc(aff.map(function(a){return a.name;}).join(', ')):'No screens picked')+'</div></div>'+
     '<div class="fgrid"><label class="f">Show<select data-f="ov.mode">'+opts(['Message','Signage','Fullscreen','Live','Off'],ov.mode)+'</select></label>'+
     '<label class="f">Theme<select data-f="ov.theme">'+opts(S.themes.map(function(t){return t.Theme;}),ov.theme)+'</select></label>'+
     '<label class="f">Ends<select data-f="ov.duration">'+[['30','In 30 minutes'],['60','In 1 hour'],['120','In 2 hours'],['eod','At the end of today'],['','When someone ends it']].map(function(x){return '<option value="'+x[0]+'"'+(ov.duration===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select></label></div>'+
     (ov.mode==='Message'?'<label class="f">Message<textarea data-f="ov.message" maxlength="240" placeholder="Short and readable from across the room">'+esc(ov.message)+'</textarea></label>':'')+
     '<div id="ovPrev">'+ovPreview()+'</div>'+
-    (ovConfirm?'<div class="confirm"><b>Start '+esc(ov.mode)+' on '+aff.length+' TV'+(aff.length===1?'':'s')+'?</b><button class="btn pri" data-act="ovGo">Start override</button><button class="btn" data-act="ovCancel">Cancel</button></div>'
+    (ovConfirm?'<div class="confirm"><b>Start '+esc(ov.mode)+' on '+aff.length+' screen'+(aff.length===1?'':'s')+'?</b><button class="btn pri" data-act="ovGo">Start override</button><button class="btn" data-act="ovCancel">Cancel</button></div>'
       :'<div class="row"><button class="btn pri" data-act="ovAsk"'+(aff.length?'':' disabled')+'>Start override…</button></div>')+'</section>';
   return h;
 }
@@ -517,7 +574,7 @@ function vThemes(){
   var f=themeForm;
   var colors='<div class="cpairs">'+COLOR_PAIRS.map(colorPair).join('')+'</div>';
   var form='<div class="fgrid">'+THEME_FIELDS.map(function(x){return '<label class="f">'+x[1]+'<input type="text" data-f="th.'+x[0]+'" value="'+esc(f[x[0]]||'')+'" placeholder="'+esc(themeFieldHint(x[0]))+'"></label>';}).join('')+'</div>';
-  return '<section class="panel"><h2>Themes</h2><div class="twocol"><div style="display:flex;flex-direction:column;gap:14px">'+list+colors+form+
+  return '<section class="panel"><h2>Look & details</h2><p class="muted small" style="margin:0">Each theme’s colors, logo, wayfinding arrows, QR code, Wi-Fi and calendars.</p><div class="twocol"><div style="display:flex;flex-direction:column;gap:14px">'+list+colors+form+
     calEditor()+'<div id="thCal">'+calNote()+'</div>'+folderNote(f.Theme)+themeAdminBox(f.Theme)+'<div class="row"><button class="btn pri" data-act="saveTheme">Save '+esc(f.Theme)+'</button><button class="btn" data-act="resetTheme">Undo changes</button></div></div>'+
     '<div><div class="muted small" style="margin-bottom:6px">Preview with wayfinding</div><div class="tvbox" id="thPrev">'+themePreview()+'</div>'+
     '<div class="muted small" style="margin:12px 0 6px">Preview without wayfinding</div><div class="tvbox" id="thPrev2">'+themePreview(true)+'</div></div></div></section>';
@@ -666,11 +723,11 @@ var pairForm=null;
 function vPairForm(){
   var f=pairForm,screenUrl=S.url+'?screen';
   var devOpts=S.allDevices.map(function(d){var full=S.devices.filter(function(x){return x.id===d.id;})[0]||{};return '<option value="'+esc(d.id)+'"'+(f.target===d.id?' selected':'')+'>'+esc(d.name)+(full.pairedAt?' (replaces its current screen)':'')+'</option>';}).join('');
-  return '<section class="panel" style="background:var(--sunk)"><h2>Pair a TV</h2>'+
-    '<ol class="small" style="margin:0;padding-left:20px"><li>On the TV, open the screen link below. A 6-character code appears.</li><li>Type the code here and pick which TV it is.</li></ol>'+
+  return '<section class="panel" style="background:var(--sunk)"><h2>Add a screen</h2>'+
+    '<ol class="small" style="margin:0;padding-left:20px"><li>Open the Church Signage app on the TV, or the screen link below in a browser. A 6-character code appears.</li><li>Type the code here and pick which screen it is.</li></ol>'+
     '<div class="row"><input type="text" id="screenLink" readonly value="'+esc(screenUrl)+'" style="flex:1;min-width:0"><button class="btn sm" data-act="copyScreen">Copy screen link</button></div>'+
-    '<div class="fgrid"><label class="f">Code on the TV<input type="text" id="pairCode" value="'+esc(f.code||'')+'" maxlength="7" autocomplete="off" style="font-size:22px;letter-spacing:.12em;text-transform:uppercase" placeholder="K7Q-4MD"></label>'+
-    '<label class="f">Which TV is it?<select id="pairTarget" data-f="pair.target"><option value="__new"'+(f.target==='__new'?' selected':'')+'>A new TV…</option>'+devOpts+'</select></label></div>'+
+    '<div class="fgrid"><label class="f">Code on the screen<input type="text" id="pairCode" value="'+esc(f.code||'')+'" maxlength="7" autocomplete="off" style="font-size:22px;letter-spacing:.12em;text-transform:uppercase" placeholder="K7Q-4MD"></label>'+
+    '<label class="f">Which screen is it?<select id="pairTarget" data-f="pair.target"><option value="__new"'+(f.target==='__new'?' selected':'')+'>A new screen…</option>'+devOpts+'</select></label></div>'+
     (f.target==='__new'?'<div class="fgrid"><label class="f">Name<input type="text" id="pairName" value="'+esc(f.name||'')+'" placeholder="Room 104"></label>'+
       '<label class="f">Kind of screen<select id="pairProfile">'+opts(['Signage','Classroom','Green Room'],f.profile||'Signage')+'</select></label>'+
       '<label class="f">Theme<select id="pairTheme">'+opts(S.allThemes,f.theme||S.allThemes[0])+'</select></label></div>':'')+
@@ -782,8 +839,8 @@ function tileKind(t){return t.type==='app'?'App: '+t.value:t.type==='web'?'Websi
 function vLaunchers(){
   if(!launchForm)launchForm=S.launchers.length?lnLoad(S.launchers[0]):lnBlank();
   var f=launchForm;
-  var h='<section class="panel"><div class="row" style="justify-content:space-between"><h2>Launchers</h2><button class="btn pri" data-act="lnNew">+ New layout</button></div>'+
-    '<p class="muted small">A launcher is the home screen people see when they leave the slides, or all the time on a classroom TV. Pick its tiles here, then choose which TVs use it. TVs leave out tiles that don\'t apply to them, such as Return to Signage on a classroom TV or Watch Live when nothing is live.</p>'+
+  var h='<section class="panel"><div class="row" style="justify-content:space-between"><h2>Home screens</h2><button class="btn pri" data-act="lnNew">+ New layout</button></div>'+
+    '<p class="muted small">A home screen layout is what people see when they leave the slides, or all the time on a classroom TV. Pick its tiles here, then choose which TVs use it. TVs leave out tiles that don\'t apply to them, such as Return to Signage on a classroom TV or Watch Live when nothing is live.</p>'+
     '<div class="row">'+S.launchers.map(function(l){return '<button class="tog'+(l.name===f.original?' on':'')+'" data-act="lnPick" data-n="'+esc(l.name)+'">'+esc(l.name)+' <span class="muted small">('+l.devices.length+' TV'+(l.devices.length===1?'':'s')+')</span></button>';}).join('')+
     (f.original?'':'<button class="tog on">New layout</button>')+'</div></section>';
   var have={};f.tiles.forEach(function(t){have[t.type]=1;});
@@ -805,7 +862,7 @@ function vLaunchers(){
       '<div class="row"><input type="text" id="lnPkgLabel" placeholder="App name" style="flex:1;min-width:120px"><input type="text" id="lnPkg" placeholder="Package, like us.zoom.videomeetings" style="flex:2;min-width:160px"><button class="btn sm" data-act="lnAddPkg">Add</button></div>'+
       '<div class="row"><input type="text" id="lnWebLabel" placeholder="Website name" style="flex:1;min-width:120px"><input type="text" id="lnWebUrl" placeholder="https://graceview.org" style="flex:2;min-width:160px"><button class="btn sm" data-act="lnAddWeb">Add</button></div>'+
       '<p class="muted small" style="margin:0">Paired TVs report their installed apps every hour, so the app list fills in once a TV has checked in.</p></div>'+
-    '<div><div class="small" style="font-weight:600;margin-bottom:6px">TVs that use this layout</div>'+checks('lnDev',S.deviceList.map(function(d){return d.id;}),f.devices).replace(/>([A-Z0-9]+)<\/label>/g,function(m,id){var d=S.deviceList.filter(function(x){return x.id===id;})[0];return '>'+esc(d?d.name+(d.launcher&&d.launcher!==f.original?' (now: '+d.launcher+')':''):id)+'</label>';})+'</div>'+
+    '<div><div class="small" style="font-weight:600;margin-bottom:6px">Screens that use this layout</div>'+checks('lnDev',S.deviceList.map(function(d){return d.id;}),f.devices).replace(/>([A-Z0-9]+)<\/label>/g,function(m,id){var d=S.deviceList.filter(function(x){return x.id===id;})[0];return '>'+esc(d?d.name+(d.launcher&&d.launcher!==f.original?' (now: '+d.launcher+')':''):id)+'</label>';})+'</div>'+
     '<label class="f">Notes<input type="text" id="lnNotes" value="'+esc(f.notes||'')+'" placeholder="Who it\'s for"></label>'+
     '<div class="row"><button class="btn pri" data-act="lnSave">Save layout</button>'+
       (f.original?(lnDelete?'<button class="btn danger" data-act="lnDelGo">Confirm delete</button>':'<button class="btn danger" data-act="lnDelAsk">Delete layout</button>'):'<button class="btn" data-act="lnCancel">Cancel</button>')+'</div>'+
@@ -828,11 +885,11 @@ function devStatus(d){
   return '<span class="chip warn">Offline</span><div class="muted small">'+(d.lastSeen?'Last seen '+esc(d.lastSeen):'Never checked in')+'</div>';
 }
 function vDevices(){
-  var h=(pairForm?vPairForm():'')+'<section class="panel"><div class="row" style="justify-content:space-between"><h2>Devices</h2>'+
-    (isAdmin()&&!pairForm?'<button class="btn pri" data-act="pairOpen">Pair a TV</button>':'')+'</div>'+
-    '<p class="muted small">Every TV, what it’s set to and whether it’s checking in. Online means it checked in within the last 3 minutes. IP address, model and app version come from the TV itself.</p>';
+  var h=(pairForm?vPairForm():'')+'<section class="panel"><div class="row" style="justify-content:space-between"><h2>Screens</h2>'+
+    (isAdmin()&&!pairForm?'<button class="btn pri" data-act="pairOpen">+ Add a screen</button>':'')+'</div>'+
+    '<p class="muted small">Every screen, what it’s set to and whether it’s checking in. Online means it checked in within the last 3 minutes. IP address, model and app version come from the screen itself.</p>';
   if(devEdit)h+=devForm();
-  h+='<div class="tbl"><table><thead><tr><th>TV</th><th>Kind</th><th>Theme</th><th>Showing now</th><th>Launcher</th><th>Status</th><th>IP address</th><th>Model / app</th><th></th></tr></thead><tbody>'+
+  h+='<div class="tbl"><table><thead><tr><th>Screen</th><th>Kind</th><th>Theme</th><th>Showing now</th><th>Home screen</th><th>Status</th><th>IP address</th><th>Model / app</th><th></th></tr></thead><tbody>'+
     S.devices.map(function(d){
       var src=d.now.source==='Special Date'?'Special':d.now.source;
       var link=S.url+'?tv='+encodeURIComponent(d.id);
@@ -840,31 +897,35 @@ function vDevices(){
       return '<tr><td><b>'+esc(d.name)+'</b>'+(d.location?'<div class="muted small">'+esc(d.location)+'</div>':'')+'</td>'+
         '<td>'+esc(d.profile)+'</td><td>'+esc(d.defaultTheme)+'</td>'+
         '<td><span class="chip '+esc(src)+'">'+esc(d.now.mode)+'</span><div class="muted small">'+esc(d.screen.theme.name)+' · '+esc(d.now.source)+'</div></td>'+
-        '<td>'+(d.launcher?esc(d.launcher):'<span class="muted">Built-in</span>')+'</td>'+
+        '<td>'+(d.launcher?esc(d.launcher):'<span class="muted">Standard</span>')+'</td>'+
         '<td>'+devStatus(d)+'</td>'+
         '<td class="num">'+(d.ip?esc(d.ip):'<span class="muted">–</span>')+'</td>'+
         '<td class="small">'+esc(d.hardware||'')+(d.version?'<div class="muted">v'+esc(d.version)+'</div>':'')+'</td>'+
         '<td><div class="row" style="flex-wrap:nowrap">'+
           (isAdmin()?'<button class="btn sm" data-act="devEditOpen" data-id="'+esc(d.id)+'">Edit</button>':'')+
-          '<a class="btn sm" href="'+esc(link)+'" target="_blank" rel="noopener">Preview</a>'+
+          '<a class="btn sm" href="'+esc(link)+'" target="_blank" rel="noopener">Full size</a>'+
           (isAdmin()?(del?'<button class="btn sm danger" data-act="devRemoveGo" data-id="'+esc(d.id)+'">Confirm remove</button>':'<button class="btn sm danger" data-act="devRemoveAsk" data-id="'+esc(d.id)+'">Remove</button>'):'')+
         '</div></td></tr>';
-    }).join('')+'</tbody></table></div>'+(S.devices.length?'':'<p class="muted">No TVs yet. Use Pair a TV to add one.</p>')+'</section>';
+    }).join('')+'</tbody></table></div>'+(S.devices.length?'':'<p class="muted">No screens yet. Use Add a screen to pair one.</p>')+'</section>';
   return h;
 }
 function devForm(){
-  var d=devEdit,launchOpts=['<option value="">Built-in tiles</option>'].concat((S.launcherNames||[]).map(function(n){return '<option'+(d.launcher===n?' selected':'')+'>'+esc(n)+'</option>';})).join('');
+  var d=devEdit,launchOpts=['<option value="">Standard tiles</option>'].concat((S.launcherNames||[]).map(function(n){return '<option'+(d.launcher===n?' selected':'')+'>'+esc(n)+'</option>';})).join('');
   return '<div class="panel" style="background:var(--sunk)"><h3>Edit '+esc(d.originalName)+'</h3><div class="fgrid">'+
     '<label class="f">Name<input type="text" id="deName" value="'+esc(d.name)+'"></label>'+
     '<label class="f">Location<input type="text" id="deLocation" value="'+esc(d.location||'')+'"></label>'+
     '<label class="f">Kind of screen<select id="deProfile">'+opts(['Signage','Classroom','Green Room'],d.profile)+'</select></label>'+
     '<label class="f">Theme<select id="deTheme">'+opts(S.allThemes,d.theme)+'</select></label>'+
     '<label class="f">When nothing is scheduled<select id="deMode">'+opts(S.modes,d.defaultMode||'Off')+'</select></label>'+
-    '<label class="f">Launcher<select id="deLauncher">'+launchOpts+'</select></label></div>'+
+    '<label class="f">Home screen layout<select id="deLauncher">'+launchOpts+'</select></label></div>'+
     '<label class="small" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="deMute"'+(d.muteLive?' checked':'')+'> Play the scheduled live service without sound</label>'+
     '<label class="small" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="deWay"'+(d.wayfinding?' checked':'')+'> Show wayfinding arrows (from its theme)</label>'+
-    '<p class="muted small" style="margin:0">Renaming also updates schedule rows, overrides, presets and Limited users that name this TV.</p>'+
-    '<div class="row"><button class="btn pri" data-act="devSave">Save</button><button class="btn" data-act="devCancel">Cancel</button></div></div>';
+    '<p class="muted small" style="margin:0">Renaming also updates schedule rows, overrides, presets and Limited users that name this screen.</p>'+
+    '<div class="row"><button class="btn pri" data-act="devSave">Save</button><button class="btn" data-act="devCancel">Cancel</button>'+
+    '<span style="flex:1"></span>'+
+    (d.paired?(pendingDelete==='tv:'+d.id?'<button class="btn sm danger" data-act="unpairGo" data-id="'+esc(d.id)+'">Confirm: unpair</button>':'<button class="btn sm" data-act="unpairAsk" data-id="'+esc(d.id)+'" title="The screen goes back to showing a pairing code. Its settings stay.">Unpair</button>'):'')+
+    (pendingDelete==='dev:'+d.id?'<button class="btn sm danger" data-act="devRemoveGo" data-id="'+esc(d.id)+'">Confirm: remove screen</button>':'<button class="btn sm danger" data-act="devRemoveAsk" data-id="'+esc(d.id)+'">Remove screen</button>')+
+    '</div></div>';
 }
 
 /* ---------- Green Room ---------- */
@@ -1071,7 +1132,7 @@ var ACT={
   moveW:function(b){call('moveWeekly',[+b.dataset.row,+b.dataset.dir],'Moved');},
   delAsk:function(b){pendingDelete=b.dataset.tab+':'+b.dataset.row;render();},
   delGo:function(b){call('deleteRow',[b.dataset.tab,+b.dataset.row],'Deleted',function(){pendingDelete=null;edit=null;});},
-  pairOpen:function(){pairForm={target:'__new'};render();var c=document.getElementById('pairCode');if(c)c.focus();},
+  pairOpen:function(){pairForm={target:'__new'};devEdit=null;render();var c=document.getElementById('pairCode');if(c)c.focus();},
   pairClose:function(){pairForm=null;render();},
   pairGo:function(){
     var tgt=val('pairTarget'),target=tgt==='__new'?{name:val('pairName'),profile:val('pairProfile'),theme:val('pairTheme')}:{deviceId:tgt};
@@ -1079,7 +1140,7 @@ var ACT={
   },
   copyScreen:function(){var i=document.getElementById('screenLink');if(!i)return;try{navigator.clipboard.writeText(i.value).then(function(){toast('Screen link copied');},function(){i.select();toast('Press Ctrl+C to copy');});}catch(e){i.select();toast('Press Ctrl+C to copy');}},
   unpairAsk:function(b){pendingDelete='tv:'+b.dataset.id;render();},
-  unpairGo:function(b){call('unpairDevice',[b.dataset.id],'Unpaired. That screen is back to showing a code.',function(){pendingDelete=null;});},
+  unpairGo:function(b){call('unpairDevice',[b.dataset.id],'Unpaired. That screen is back to showing a code.',function(){pendingDelete=null;devEdit=null;});},
   addTheme:function(){addingTheme=true;render();},
   addThemeCancel:function(){addingTheme=false;render();},
   addThemeGo:function(){
@@ -1184,7 +1245,8 @@ var ACT={
 
   /* devices */
   devEditOpen:function(b){var d=S.devices.filter(function(x){return x.id===b.dataset.id;})[0];if(!d)return;
-    devEdit={id:d.id,originalName:d.name,name:d.name,location:d.location||'',profile:d.profile,theme:d.defaultTheme,defaultMode:d.defaultMode,launcher:d.launcher,muteLive:d.muteLive,wayfinding:d.wayfinding};pendingDelete=null;render();},
+    devEdit={id:d.id,originalName:d.name,name:d.name,location:d.location||'',profile:d.profile,theme:d.defaultTheme,defaultMode:d.defaultMode,launcher:d.launcher,muteLive:d.muteLive,wayfinding:d.wayfinding,paired:!!d.pairedAt};
+    pendingDelete=null;pairForm=null;render();var e=document.getElementById('deName');if(e&&e.scrollIntoView)e.scrollIntoView({block:'center'});},
   devCancel:function(){devEdit=null;render();},
   devSave:function(){
     var v={id:devEdit.id,name:val('deName'),location:val('deLocation'),profile:val('deProfile'),theme:val('deTheme'),defaultMode:val('deMode'),launcher:val('deLauncher'),
@@ -1192,7 +1254,7 @@ var ACT={
     call('saveDevice',[v],'',function(r){devEdit=null;toast(r&&r.renamed?'Saved. Also updated '+r.renamed+' rows that named this TV.':'Saved');});
   },
   devRemoveAsk:function(b){pendingDelete='dev:'+b.dataset.id;render();},
-  devRemoveGo:function(b){call('removeDevice',[b.dataset.id],'TV removed',function(){pendingDelete=null;});},
+  devRemoveGo:function(b){call('removeDevice',[b.dataset.id],'Screen removed',function(){pendingDelete=null;devEdit=null;});},
 
   /* green room */
   pcoEdit:function(){grCapture();pcoEditing=true;render();},
