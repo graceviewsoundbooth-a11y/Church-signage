@@ -166,7 +166,7 @@ tr.flag td:first-child{box-shadow:inset 4px 0 var(--warn)}
 <body>
 <div id="busy"></div>
 <header class="top">
-  <div class="brand" id="brand"><div class="mk">S</div><h1>Church Signage</h1><span class="lab">Lab</span></div>
+  <div class="brand" id="brand"><div class="mk">S</div><h1>Church Signage</h1></div>
   <div class="topr"><button id="ovBtn" class="ovbtn" data-act="view" data-v="override" type="button" hidden></button><button class="modebtn" id="modeBtn" data-act="colorMode" type="button"></button><div class="who" id="who">Loading…</div></div>
 </header>
 <nav id="nav" aria-label="Sections"></nav>
@@ -1058,7 +1058,7 @@ function drawBrand(){
   var name=S.church||'Church Signage',logo=(S.churchDefaults&&S.churchDefaults.logo)||S.logo||'';
   var key=name+'|'+logo;if(b.dataset.k===key)return;b.dataset.k=key;
   b.innerHTML=(logo?'<div class="mkimg"><img src="'+esc(logo)+'" alt=""></div>':'<div class="mk">'+esc(name.charAt(0).toUpperCase())+'</div>')+
-    '<h1>'+esc(name)+'</h1><span class="lab">Lab</span>';
+    '<h1>'+esc(name)+'</h1>';
 }
 
 /* ---------- Church settings (Owner and Admin) ----------
