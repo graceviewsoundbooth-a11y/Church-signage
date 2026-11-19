@@ -49,7 +49,7 @@ On **Settings → People**, choose **Invite someone**, pick a role and send the 
 | Owner | Everything, including adding Admins |
 | Admin | Everything: screens, schedule, themes, slides, launchers, Green Room, people |
 | Staff | See every TV, upload and manage slides, start and end overrides, read the activity log |
-| Limited | Edit only the themes and slides you pick, and see only the TVs you pick (a school or a renter) |
+| Limited | Edit only the themes and slides you pick (their look, logo, arrows, QR, Wi-Fi, calendars and slides), and see only the TVs you pick. They never see other themes or TVs, and can't add, delete or re-folder a theme (a school or a renter). Give a renter its own theme and slides folder: if their theme shares a folder with another theme, they can change those slides too |
 
 - **New link** resets a forgotten password (older links stop working). **Turn off** signs someone out at once; **Remove** deletes them.
 - Passwords, sign-ins, invite links and the Planning Center login live in the script's private storage, never in the Sheet. Accounts lock for 15 minutes after 5 wrong passwords.

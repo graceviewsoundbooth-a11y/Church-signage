@@ -1456,6 +1456,7 @@ function getState(iso, token) {
              now: now, screen: screen_(v, now, t, d) };
   });
   const themes = d.themes.filter(function (x) { return themeOk_(me, x.Theme); });
+  const seenDevices = me.role === 'Limited' ? d.devices.filter(function (v) { return deviceOk_(me, v); }) : d.devices;
   return {
     me: me, perms: PERMS[me.role], t: t, url: ScriptApp.getService().getUrl(), church: st['Church Name'] || '',
     churchSettings: needAdminOk_(me) ? church_() : null, timeZone: tz_(),
@@ -1465,7 +1466,8 @@ function getState(iso, token) {
                status: u.Status, invitedBy: u['Invited By'], invitedAt: u['Invited At'], lastSignIn: u['Last Sign-in'] };
     }) : [],
     owner: can_(me, 'users') ? { name: st['Owner Name'] || 'Owner', email: st['Owner Email'] || '' } : null,
-    roles: ROLES, allThemes: d.themes.map(function (x) { return x.Theme; }),
+    // A Limited person (a renter, a school) only hears about their own themes and TVs.
+    roles: ROLES, allThemes: (me.role === 'Limited' ? themes : d.themes).map(function (x) { return x.Theme; }),
     launchers: needAdminOk_(me) ? d.launchers.map(function (l) {
       return { name: l.Name, tiles: parseTiles_(l.Tiles), idleMinutes: Number(l['Idle Minutes']) || 0, notes: l.Notes || '',
                devices: d.devices.filter(function (v) { return String(v.Launcher || '') === l.Name; }).map(function (v) { return v['Device ID']; }) };
@@ -1473,8 +1475,8 @@ function getState(iso, token) {
     builtinTiles: BUILTIN_TILES, reportedApps: needAdminOk_(me) ? reportedApps_() : [],
     launcherNames: d.launchers.map(function (l) { return l.Name; }),
     greenRoom: can_(me, 'greenroom') ? greenRoomForPanel_(d) : null,
-    deviceList: d.devices.map(function (v) { return { id: v['Device ID'], name: v.Name, profile: v.Profile, launcher: v.Launcher || '' }; }),
-    devices: devices, allDevices: d.devices.map(function (v) { return { id: v['Device ID'], name: v.Name, profile: v.Profile }; }),
+    deviceList: seenDevices.map(function (v) { return { id: v['Device ID'], name: v.Name, profile: v.Profile, launcher: v.Launcher || '' }; }),
+    devices: devices, allDevices: seenDevices.map(function (v) { return { id: v['Device ID'], name: v.Name, profile: v.Profile }; }),
     themes: themes, themeObjs: themes.map(themeObj_), fallbackTheme: fallbackTheme_(d),
     slidesByTheme: themes.reduce(function (m, th) { m[th.Theme] = slidesFor_(th, t); return m; }, {}),
     folders: (can_(me, 'slides') || can_(me, 'theme')) ? themes.reduce(function (m, th) { m[th.Theme] = folderFiles_(th); return m; }, {}) : {},
@@ -2131,6 +2133,9 @@ function saveTheme(th, token) {
     });
     const row = d.themes.filter(function (x) { return x.Theme === th.Theme; })[0];
     if (!row) throw new Error('Theme "' + th.Theme + '" isn\'t on the Themes tab.');
+    // Only the Owner and Admins choose a theme's slides folder. Anyone else keeps the one it has, so a
+    // Limited person can't point their theme at another theme's folder and change those slides.
+    if (!needAdminOk_(me)) th['Slides Folder'] = row['Slides Folder'];
     const vals = [th.Theme, th['Display Name'], txt_(th.Main), txt_(th.Accent), th['Logo URL'], th['Wayfinding Left'],
                   th['Wayfinding Right'], th['QR Label'], th['QR Link'], th['Wi-Fi Name'], th['Wi-Fi Password'],
                   th.Calendar || '', th['Calendar Hide'], th['Slides Folder'] || '', th['Main Text'], th['Accent Text']];
