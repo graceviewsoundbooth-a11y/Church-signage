@@ -54,14 +54,116 @@ function include(name) {
 
 /* ---------- Sheet helpers ---------- */
 
+/* ----- Fast reads -----
+ * Each read of a Sheet tab is a round trip to Google Sheets, and a dashboard load needs about ten of them.
+ * So every tab's values are also kept in the script cache under that tab's current version, and a whole
+ * load fetches them in two cache calls. Anything that writes to a tab gets it through sheet_(), which gives
+ * the tab a new version (again once the write is saved), so the next read goes back to the Sheet. Typing
+ * straight into the Sheet does the same through onEdit. Nothing is kept longer than TAB_TTL either way.
+ */
+const TAB_TTL = 600;        // seconds a tab's values stay cached
+const TABS = ['Settings', 'Users', 'Devices', 'Themes', 'Weekly', 'Special Dates', 'Override', 'Launchers', 'Green Room', 'Presets'];
+let book__ = null, tabMemo_ = {}, dirtyTabs_ = {};
+function book_() { return book__ || (book__ = SpreadsheetApp.getActive()); }
+function tabSheet_(name) { return book_().getSheetByName(name); }
+function newVer_() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+/** A tab to write to. Marks it changed, so cached copies of it aren't used again. */
 function sheet_(name) {
-  const sh = SpreadsheetApp.getActive().getSheetByName(name);
+  const sh = book_().getSheetByName(name);
   if (!sh) throw new Error('The Sheet is missing its "' + name + '" tab.');
+  delete tabMemo_[name];
+  if (name === 'Settings') settingsCache_ = null;
+  if (!dirtyTabs_[name]) { dirtyTabs_[name] = true; bumpTabs_([name]); }
   return sh;
+}
+function bumpTabs_(names) {
+  try {
+    const c = CacheService.getScriptCache();
+    names.forEach(function (n) { c.put('tabv:' + n, newVer_(), 21600); });
+  } catch (err) { /* the cache is only a shortcut */ }
+}
+/** After writes: saves them, then gives the changed tabs a new version once more (a read in between may have cached the old values). */
+function saveTabs_() {
+  const names = Object.keys(dirtyTabs_);
+  if (!names.length) return;
+  try { SpreadsheetApp.flush(); } catch (err) { /* nothing to save */ }
+  bumpTabs_(names);
+  dirtyTabs_ = {};
+}
+/** Someone typed into the Sheet itself: that tab is read fresh next time. (A simple trigger: no setup needed.) */
+function onEdit(e) {
+  try { CacheService.getScriptCache().put('tabv:' + e.range.getSheet().getName(), newVer_(), 21600); } catch (err) { /* ignore */ }
+}
+
+/** Display values of several tabs at once: { name: [[...], ...] } (null for a missing tab), from the cache when it's current. */
+function tabValues_(names) {
+  const need = names.filter(function (n) { return !Object.prototype.hasOwnProperty.call(tabMemo_, n); });
+  if (need.length) {
+    let c = null, vers = {}, hits = {};
+    try {
+      c = CacheService.getScriptCache();
+      vers = c.getAll(need.map(function (n) { return 'tabv:' + n; }));
+      const keys = need.filter(function (n) { return vers['tabv:' + n]; }).map(function (n) { return 'tab:' + n + ':' + vers['tabv:' + n]; });
+      hits = keys.length ? c.getAll(keys) : {};
+    } catch (err) { c = null; }
+    need.forEach(function (n) {
+      let ver = vers['tabv:' + n];
+      const hit = ver && hits['tab:' + n + ':' + ver];
+      if (hit) { try { tabMemo_[n] = JSON.parse(hit); return; } catch (err) { /* read it below */ } }
+      const sh = tabSheet_(n);
+      const vals = sh ? sh.getDataRange().getDisplayValues() : null;
+      tabMemo_[n] = vals;
+      if (!c || !vals) return;
+      try {
+        if (!ver) { ver = newVer_(); c.put('tabv:' + n, ver, 21600); }
+        const s = JSON.stringify(vals);
+        if (s.length < 90000) c.put('tab:' + n + ':' + ver, s, TAB_TTL);
+      } catch (err) { /* too big to cache: read from the Sheet each time */ }
+    });
+  }
+  const out = {};
+  names.forEach(function (n) { out[n] = tabMemo_[n]; });
+  return out;
+}
+
+/** The last n rows of the Activity tab, newest first. Reads only those rows, since the tab keeps growing. Cached like the other tabs. */
+function activityTail_(n) {
+  let c = null, ver = '';
+  try {
+    c = CacheService.getScriptCache();
+    ver = c.get('tabv:Activity') || '';
+    const hit = ver && c.get('acttail:' + n + ':' + ver);
+    if (hit) return JSON.parse(hit);
+  } catch (err) { c = null; }
+  const sh = book_().getSheetByName('Activity');
+  if (!sh) return [];
+  const last = sh.getLastRow(), cols = Math.max(1, sh.getLastColumn());
+  const head = sh.getRange(1, 1, 1, cols).getDisplayValues()[0];
+  const out = [];
+  if (last >= 2) {
+    const start = Math.max(2, last - n + 1);
+    sh.getRange(start, 1, last - start + 1, cols).getDisplayValues().forEach(function (r, i) {
+      if (isBlank_(r)) return;
+      const o = { _row: start + i };
+      head.forEach(function (h, j) { o[h] = r[j]; });
+      out.push(o);
+    });
+  }
+  out.reverse();
+  if (c) {
+    try {
+      if (!ver) { ver = newVer_(); c.put('tabv:Activity', ver, 21600); }
+      c.put('acttail:' + n + ':' + ver, JSON.stringify(out), TAB_TTL);
+    } catch (err) { /* ignore */ }
+  }
+  return out;
 }
 
 function rows_(name) {
-  const v = sheet_(name).getDataRange().getDisplayValues();
+  const all = tabValues_([name])[name];
+  if (!all) throw new Error('The Sheet is missing its "' + name + '" tab.');
+  const v = all.slice();
   const head = v.shift() || [];
   const out = [];
   v.forEach(function (r, i) {
@@ -118,6 +220,7 @@ function at_(iso) {
 }
 
 function data_() {
+  tabValues_(TABS); // every tab in one go
   return {
     devices: rows_('Devices'),
     themes: rows_('Themes'),
@@ -305,13 +408,19 @@ function buildSlideName_(order, p) {
     (p.from ? ' [from ' + p.from + ']' : '') + (p.until ? ' [until ' + p.until + ']' : '') + '.' + (p.ext || 'jpg');
 }
 
-/** Lists a theme's slides folder, in play order. Cached for 60 seconds unless `fresh`. */
+/**
+ * Lists a theme's slides folder, in play order. Cached for FOLDER_TTL unless `fresh`; the dashboard's own
+ * uploads, moves and deletes list it fresh right away, so only files added straight in Drive wait.
+ */
+const FOLDER_TTL = 300;
+let folderMemo_ = {};
 function folderFiles_(th, fresh) {
   const id = folderId_(th['Slides Folder']);
   if (!id) return { linked: false, files: [], error: '' };
+  if (!fresh && folderMemo_[id]) return JSON.parse(folderMemo_[id]);
   const cache = CacheService.getScriptCache();
   const key = 'folder:' + id;
-  if (!fresh) { const hit = cache.get(key); if (hit) return JSON.parse(hit); }
+  if (!fresh) { const hit = cache.get(key); if (hit) { folderMemo_[id] = hit; return JSON.parse(hit); } }
   const today = Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd');
   let out;
   try {
@@ -330,7 +439,9 @@ function folderFiles_(th, fresh) {
     }
     files.sort(function (a, b) { return a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' }); });
     out = { linked: true, files: files, name: folder.getName(), url: folder.getUrl(), error: '', shared: isSharedByLink_(folder) };
-    try { cache.put(key, JSON.stringify(out), 60); } catch (err) { /* too big to cache */ }
+    const s = JSON.stringify(out);
+    folderMemo_[id] = s;
+    try { cache.put(key, s, FOLDER_TTL); } catch (err) { /* too big to cache */ }
   } catch (err) {
     const why = String(err && err.message || err);
     console.error('Slides folder ' + id + ': ' + why);
@@ -611,9 +722,18 @@ function combineCalendars_(lists) {
  * 'loaded', 'error', 'invalid' or 'unused' (a fallback that wasn't needed this week).
  * checkAll fetches every fallback too (the Themes page's "Check all calendars"), without changing the result.
  */
+let calMemo_ = {};
 function calendar_(th, t, checkAll) {
   const src = String(th.Calendar || '').trim();
   if (!src) return { events: [], count: 0, errors: [], sources: [] };
+  // The dashboard asks for the same theme's calendar several times in one load: work it out once.
+  const memoKey = [src, th['Calendar Hide'], t.ymd, t.mins, !!checkAll].join('|');
+  if (calMemo_[memoKey]) return JSON.parse(calMemo_[memoKey]);
+  const r = calendarUncached_(th, t, checkAll, src);
+  calMemo_[memoKey] = JSON.stringify(r);
+  return r;
+}
+function calendarUncached_(th, t, checkAll, src) {
   const hide = split_(th['Calendar Hide'], ';').map(function (x) { return x.toLowerCase(); });
   const keep = function (e) {
     const title = String(e.title).toLowerCase();
@@ -891,7 +1011,13 @@ const SESSION_DAYS = 30;
 const INVITE_DAYS = 7;
 const MIN_PASSWORD = 8;
 
-function props_() { return PropertiesService.getScriptProperties(); }
+let propsMemo_ = null;
+function props_() { propsMemo_ = null; return PropertiesService.getScriptProperties(); } // may write: forget the read-only copy
+/** One script property, read from a single copy of them all (one call per request instead of one per TV). */
+function prop_(key) {
+  if (!propsMemo_) propsMemo_ = PropertiesService.getScriptProperties().getProperties();
+  return Object.prototype.hasOwnProperty.call(propsMemo_, key) ? propsMemo_[key] : null;
+}
 function sha_(s) { return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8)); }
 function newToken_() { return (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, ''); }
 function normEmail_(e) { return String(e || '').trim().toLowerCase(); }
@@ -932,13 +1058,14 @@ let settingsCache_ = null; // read once per request; cleared on every write
 function settings_() {
   if (settingsCache_) return Object.assign({}, settingsCache_);
   const out = {};
-  try { sheet_('Settings').getDataRange().getDisplayValues().slice(1).forEach(function (r) { if (r[0]) out[r[0]] = r[1]; }); }
-  catch (err) { return out; /* no Settings tab yet */ }
+  const v = tabValues_(['Settings']).Settings;
+  if (!v) return out; // no Settings tab yet
+  v.slice(1).forEach(function (r) { if (r[0]) out[r[0]] = r[1]; });
   settingsCache_ = out;
   return Object.assign({}, out);
 }
 function setSetting_(key, value) {
-  settingsCache_ = null;
+  settingsCache_ = null; delete tabMemo_.Settings;
   const sh = sheet_('Settings');
   const v = sh.getDataRange().getDisplayValues();
   for (let i = 1; i < v.length; i++) {
@@ -1159,7 +1286,7 @@ function signIn(email, password) {
     throw new Error('That email and password don\'t match.');
   }
   cache.remove(failKey);
-  if (u) sheet_('Users').getRange(u._row, 9).setValue("'" + stampNow_());
+  if (u) { sheet_('Users').getRange(u._row, 9).setValue("'" + stampNow_()); saveTabs_(); }
   return startSession_(email);
 }
 
@@ -1325,7 +1452,7 @@ function getState(iso, token) {
              online: minutesAgo_(v['Last Seen']) <= 3,
              ip: v['IP Address'] || '', nowShowing: v['Now Showing'] || '', defaultTheme: v['Default Theme'] || '',
              defaultMode: v['Default Mode'] || '', launcher: v.Launcher || '', muteLive: bool_(v['Mute Live']), wayfinding: bool_(v.Wayfinding),
-             reportedApps: (function () { try { return JSON.parse(props_().getProperty('apps:' + v['Device ID']) || '[]').length; } catch (e) { return 0; } })(),
+             reportedApps: (function () { try { return JSON.parse(prop_('apps:' + v['Device ID']) || '[]').length; } catch (e) { return 0; } })(),
              now: now, screen: screen_(v, now, t, d) };
   });
   const themes = d.themes.filter(function (x) { return themeOk_(me, x.Theme); });
@@ -1360,7 +1487,7 @@ function getState(iso, token) {
     weekly: can_(me, 'schedule') ? d.weekly : [], special: can_(me, 'schedule') ? d.special : [],
     conflicts: can_(me, 'schedule') ? conflicts_(d) : [],
     override: d.override, presets: can_(me, 'override') ? d.presets : [],
-    activity: can_(me, 'activity') ? rows_('Activity').slice(-50).reverse() : [],
+    activity: can_(me, 'activity') ? activityTail_(50) : [],
     modes: MODES, days: DAY_VALUES, weather: weather_(),
   };
 }
@@ -1410,7 +1537,7 @@ function doPost(e) {
  */
 function panelApi_() {
   return {
-    getState: getState, signIn: signIn, signOut: signOut, inviteInfo: inviteInfo, acceptInvite: acceptInvite,
+    act: act, getState: getState, signIn: signIn, signOut: signOut, inviteInfo: inviteInfo, acceptInvite: acceptInvite,
     changePassword: changePassword, findPlace: findPlace, checkCalendars: checkCalendars, themeUsage: themeUsage,
     uploadSlide: uploadSlide, addTheme: addTheme, approvePairing: approvePairing, clearPlanningCenter: clearPlanningCenter,
     createThemeFolder: createThemeFolder, deleteLauncher: deleteLauncher, deleteRow: deleteRow, deleteTheme: deleteTheme,
@@ -1422,6 +1549,16 @@ function panelApi_() {
     setUserActive: setUserActive, shareThemeFolder: shareThemeFolder, startOverride: startOverride,
     trashSlideFile: trashSlideFile, unpairDevice: unpairDevice, uploadChurchLogo: uploadChurchLogo,
   };
+}
+/**
+ * A change and the refreshed dashboard in one trip: runs one of the calls above, then getState.
+ * The dashboard used to wait for the change, then ask again for the state: two trips to Google.
+ */
+function act(fn, args, iso, token) {
+  if (fn === 'act') throw new Error('Unknown call.');
+  const r = panelCall_(fn, args);
+  if (!r.ok) throw new Error(r.error);
+  return { result: r.result, state: getState(iso, token) };
 }
 function panelCall_(fn, args) {
   const api = panelApi_();
@@ -1515,7 +1652,8 @@ function saveReportedApps_(deviceId, apps) {
 
 /** Every app any paired TV has reported, for the "Add an app" picker. */
 function reportedApps_() {
-  const all = props_().getProperties();
+  prop_('');
+  const all = propsMemo_;
   const byPkg = {};
   Object.keys(all).forEach(function (k) {
     if (k.indexOf('apps:') !== 0) return;
@@ -1795,6 +1933,7 @@ function heartbeat_(dev, now, info) {
   sh.getRange(dev._row, 10, 1, 3).setValues([["'" + stampNow_(), "'" + version, showing]]);
   if (model && model !== dev.Hardware) sh.getRange(dev._row, 5).setValue(model);
   if (ip && ip !== dev['IP Address']) sh.getRange(dev._row, 16).setValue("'" + ip);
+  saveTabs_();
   cache.put(key, sig, 60);
 }
 
@@ -1881,7 +2020,7 @@ function removeDevice(id, token) {
 function locked_(fn) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
-  try { return fn(); } finally { lock.releaseLock(); }
+  try { return fn(); } finally { saveTabs_(); lock.releaseLock(); }
 }
 
 function log_(me, action, details) {
@@ -2018,8 +2157,8 @@ const GREEN_ROOM_SETTINGS = ['Planning Center Service Type ID', 'Mic Assignment 
 const MIC_SOURCES = ['Position name', 'Assignment notes', 'Plan note', 'Avantis channel names', ''];
 
 function greenRoomRows_() {
-  try { return sheet_('Green Room').getDataRange().getDisplayValues().map(function (r) { return r.slice(0, 4).map(String); }); }
-  catch (err) { return []; }
+  const v = tabValues_(['Green Room'])['Green Room'];
+  return v ? v.map(function (r) { return r.slice(0, 4).map(String); }) : [];
 }
 
 function isGreenRoom_(dev) { return String(dev.Profile || '').replace(/\s/g, '').toLowerCase() === 'greenroom'; }
@@ -2059,14 +2198,14 @@ function saveGreenRoomStatus_(deviceId, status) {
 
 function greenRoomForPanel_(d) {
   const parsed = parseGreenRoomRows_(d.greenRoom || []);
-  const raw = props_().getProperty('pco');
+  const raw = prop_('pco');
   const pco = raw ? JSON.parse(raw) : null;
   return {
     settings: parsed.settings, mics: parsed.mics, micSources: MIC_SOURCES, hasTab: (d.greenRoom || []).length > 0,
     // Never the secret itself: only whether a login is saved, its last 4 ID characters, and who saved it when.
     planningCenter: pco ? { saved: true, idHint: '…' + String(pco.appId).slice(-4), savedBy: pco.savedBy, savedAt: pco.savedAt } : { saved: false },
     tvs: d.devices.filter(isGreenRoom_).map(function (v) {
-      const r = props_().getProperty('grstatus:' + v['Device ID']);
+      const r = prop_('grstatus:' + v['Device ID']);
       return { id: v['Device ID'], name: v.Name, paired: !!v['Paired At'], status: r ? JSON.parse(r) : null };
     }),
   };

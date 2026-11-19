@@ -36,7 +36,7 @@ On a phone the sections become a bar at the bottom. The corner button switches l
    - **Who has access:** Anyone (the TV app can't sign in to Google; the dashboard's own sign-in and TV pairing protect everything)
 7. Copy the **Web app URL**.
 
-**After a code change:** paste the changed files, then **Deploy > Manage deployments > pencil > Version: New version > Deploy**. The URL stays the same. A new version can take a minute to appear; refresh with Ctrl+Shift+R.
+**After a code change:** paste the changed files, then **Deploy > Manage deployments > pencil > Version: New version > Deploy**. The URL stays the same. A new version can take a minute to appear; refresh with Ctrl+Shift+R. If you use the website loader, its page copy updates itself on the next visit.
 
 ## First run and people
 
@@ -82,7 +82,7 @@ The same rules as the live system: **Override** beats **Special Dates**, which b
 
 Slides are uploaded files only (JPG, PNG, MP4). Each theme has a folder in Drive, shared "anyone with the link can view" so every TV can load it.
 
-- Add files under **Content → Slides** (drag and drop, up to 45 MB) or straight into the Drive folder. TVs pick them up within about a minute.
+- Add files under **Content → Slides** (drag and drop, up to 45 MB) or straight into the Drive folder. TVs pick up files added on the dashboard within about a minute, and files dropped straight into Drive within about 5 minutes.
 - **Order** is the file name (`01 Welcome.jpg`); the ↑ ↓ buttons renumber. **Dates** are tags in the name: `[from 12-01]`, `[until 2026-12-24]`; the date boxes write them. **`[full]`** plays a whole video (up to 3 minutes).
 - **Delete** moves the file to Drive's trash (restorable for 30 days).
 - A folder linked by hand that isn't shared shows a warning with a **Make viewable by link** button.

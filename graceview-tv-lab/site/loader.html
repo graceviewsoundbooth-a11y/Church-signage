@@ -8,6 +8,9 @@
   (Google Drive's "Sorry, unable to open the file at this time"). This loads the dashboard from the
   web app without the browser's Google accounts, so it opens for everyone, with the church's address.
 
+  Faster: it asks for the page and for the signed-in person's dashboard at the same time, and keeps a
+  copy of the page in this browser, so later visits only wait for the dashboard itself.
+
   If the dashboard is ever redeployed under a NEW deployment (a new /exec link), change EXEC below.
   "Manage deployments > New version" keeps the same link, so nothing here changes.
 -->
@@ -17,24 +20,48 @@
 <script>
 (function () {
   var EXEC = 'https://script.google.com/macros/s/AKfycbz1e2aevuTTBZJMOdzksVbK2BqcyRBR2ffS8R-IDmJ03vUMJ50jZRt7X02YV9AmoriWtQ/exec';
+  var PAGE_KEY = 'cs-dash-page';
   var box = document.getElementById('cs-dash');
   function failed(why) {
     box.innerHTML = '<p><b>The signage dashboard didn’t load.</b></p><p style="color:#777">' + why + '</p>' +
       '<p><a href="" onclick="location.reload();return false;">Try again</a> · <a href="' + EXEC + '">Open it on Google instead</a></p>';
   }
+  function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function put(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* full or blocked: no copy kept */ } }
   // Pass this page's own query (an invite link's ?invite=…) on to the dashboard.
   var q = location.search.replace(/^\?/, '');
+
+  // Ask for the signed-in person's dashboard now, while the page itself loads; the page picks up this answer.
   // credentials: 'omit' is the point: no Google accounts are sent, so Google doesn't add /u/N/.
-  fetch(EXEC + '?app=panel' + (q ? '&' + q : ''), { credentials: 'omit' })
+  var token = get('gvlab-token') || '';
+  window.__csFirst = {
+    token: token,
+    p: fetch(EXEC, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                     body: JSON.stringify({ action: 'panel', fn: 'getState', args: ['', token] }) })
+      .then(function (r) { return r.json(); })
+  };
+  window.__csFirst.p.catch(function () { /* the page reports it */ });
+
+  function show(page) {
+    // The dashboard is a whole page: it replaces this one (the website's header and footer go away).
+    document.open();
+    document.write(page.html);
+    document.close();
+    if (page.title) document.title = page.title;
+  }
+  var fresh = fetch(EXEC + '?app=panel' + (q ? '&' + q : ''), { credentials: 'omit' })
     .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(function (j) {
-      if (!j || !j.html) throw new Error(j && j.error ? j.error : 'Empty reply');
-      // The dashboard is a whole page: it replaces this one (the website's header and footer go away).
-      document.open();
-      document.write(j.html);
-      document.close();
-      if (j.title) document.title = j.title;
-    })
-    .catch(function (e) { failed('Check the internet connection. (' + (e && e.message ? e.message : e) + ')'); });
+    .then(function (j) { if (!j || !j.html) throw new Error(j && j.error ? j.error : 'Empty reply'); return j; });
+
+  // A plain visit (no invite link) can use the copy of the page from last time, and keep the new one for next time.
+  var saved = null;
+  if (!q) { try { saved = JSON.parse(get(PAGE_KEY) || 'null'); } catch (e) { saved = null; } }
+  if (saved && saved.html) {
+    show(saved);
+    fresh.then(function (j) { if (j.html !== saved.html) put(PAGE_KEY, JSON.stringify(j)); }).catch(function () {});
+  } else {
+    fresh.then(function (j) { if (!q) put(PAGE_KEY, JSON.stringify(j)); show(j); })
+      .catch(function (e) { failed('Check the internet connection. (' + (e && e.message ? e.message : e) + ')'); });
+  }
 })();
 </script>

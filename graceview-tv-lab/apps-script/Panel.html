@@ -214,6 +214,14 @@ if(P.site&&P.exec&&(typeof google==='undefined'||!google.script||!google.script.
         if(k==='withUserObject')return function(){return runner(ok,fail);};
         return function(){
           var args=Array.prototype.slice.call(arguments);
+          // The loader already asked for the first state while this page was loading: use that answer once.
+          var first=window.__csFirst;
+          if(k==='getState'&&first&&first.p&&!args[0]&&args[1]===first.token){
+            window.__csFirst=null;
+            first.p.then(function(j){if(j&&j.ok){if(ok)ok(j.result);}else if(fail)fail({message:(j&&j.error)||'Something went wrong. Try again.'});})
+              .catch(function(){if(fail)fail({message:'Couldn\'t reach the dashboard. Check the connection and try again.'});});
+            return;
+          }
           fetch(P.exec,{method:'POST',credentials:'omit',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'panel',fn:String(k),args:args})})
             .then(function(r){return r.json();})
             .then(function(j){if(j&&j.ok){if(ok)ok(j.result);}else if(fail)fail({message:(j&&j.error)||'Something went wrong. Try again.'});})
@@ -240,8 +248,9 @@ function load(){busy(true);google.script.run.withSuccessHandler(function(st){S=s
 /* Every change sends the sign-in token last, so the server knows who is asking. */
 function call(fn,args,okMsg,after){
   busy(true);
-  var r=google.script.run.withSuccessHandler(function(res){if(after)after(res);if(okMsg)toast(okMsg);load();}).withFailureHandler(fail);
-  r[fn].apply(r,args.concat([TOKEN]));
+  // The change and the refreshed dashboard come back together (one trip to Google instead of two).
+  google.script.run.withSuccessHandler(function(r){if(after)after(r.result);if(okMsg)toast(okMsg);S=r.state;busy(false);render();})
+    .withFailureHandler(fail).act(fn,args.concat([TOKEN]),preview,TOKEN);
 }
 function can(p){return !p||(S.perms||[]).indexOf(p)>=0;}
 
