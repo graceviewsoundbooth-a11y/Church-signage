@@ -1113,7 +1113,7 @@ function me_(d, token) {
   if (google && google === owner) return { email: owner, name: st['Owner Name'] || 'Owner', role: 'Owner', themes: ['ALL'], devices: ['ALL'], viaGoogle: true };
   const email = sessionEmail_(token);
   if (email && email === owner) return { email: owner, name: st['Owner Name'] || 'Owner', role: 'Owner', themes: ['ALL'], devices: ['ALL'] };
-  const u = email ? userRow_(d, email) : null;
+  const u = email ? userRow_(d || { users: rows_('Users') }, email) : null; // d can be null: only the Users tab is needed
   if (!u || u.Status !== 'Active' || !PERMS[u.Role] || u.Role === 'Owner') {
     return { state: 'SignIn', role: 'None', themes: [], devices: [] };
   }
@@ -1312,10 +1312,11 @@ function need_(me, perm, theme) {
 /* ---------- Reads for the pages ---------- */
 
 function getState(iso, token) {
-  const d = data_();
-  const me = me_(d, token);
+  // Who it is first, from the Users tab alone: a signed-out visitor gets the sign-in page without reading the whole Sheet.
+  const me = me_(null, token);
   const st = settings_();
   if (me.role === 'None') return { me: me, state: me.state, church: st['Church Name'] || '', logo: logoImg_(st['Church Logo']) }; // the sign-in page shows the church's name and logo
+  const d = data_();
   const t = at_(iso);
   const devices = d.devices.filter(function (v) { return deviceOk_(me, v); }).map(function (v) {
     const now = resolve_(v, t, d);
