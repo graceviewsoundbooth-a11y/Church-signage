@@ -440,7 +440,7 @@ function logoImg_(link) {
 function slidesFor_(th, t) {
   return folderFiles_(th).files
     .filter(function (f) { return (!f.from || f.from <= t.ymd) && (!f.until || f.until >= t.ymd); })
-    .map(function (f) { return { title: f.title, sub: '', img: f.thumb, full: f.full, video: f.video }; });
+    .map(function (f) { return { title: f.title, sub: '', img: f.thumb, full: f.full, video: f.video, id: f.video ? f.id : '' }; });
 }
 
 /* ---------- Slide folders (Google Drive) ----------
@@ -1214,7 +1214,23 @@ function church_() {
     liveYouTube: String(st['Live YouTube'] || '').trim(),
     liveLocal: String(st['Live Local Stream'] || '').trim(),
     livePlays: livePlays_(st),
+    videoKey: String(st['Google API Key'] || '').trim(),
+    videoKeyBuiltIn: !!BUILTIN_VIDEO_KEY,
   };
+}
+
+/* ---------- Video in browser previews ----------
+ * Drive won't hand a video file to a web page on another site (its download link is "same-site" only), so
+ * full-size previews and browser screens load videos through the Drive API, which needs an API key. Every
+ * copy of Church Signage ships with BUILTIN_VIDEO_KEY; a church can put its own on the Church page instead.
+ * The key can only read files already shared by link (slides are), and the Drive API doesn't bill.
+ * With no key at all, previews show videos as stills. TVs never need it.
+ */
+const BUILTIN_VIDEO_KEY = '';
+const VIDEO_KEY_RE = /^AIza[0-9A-Za-z_-]{35}$/;
+function videoKey_() {
+  const own = String(settings_()['Google API Key'] || '').trim();
+  return VIDEO_KEY_RE.test(own) ? own : BUILTIN_VIDEO_KEY;
 }
 
 /* ---------- Live feed ----------
@@ -1275,6 +1291,8 @@ function saveChurchSettings(o, token) {
   if (yt && !YOUTUBE_RE.test(yt)) throw new Error('The YouTube address should be the channel\'s live link, like https://www.youtube.com/@yourchurch/live');
   if (local && !STREAM_RE.test(local)) throw new Error('The local stream address should start with rtsp://, srt:// or https://');
   if (o.livePlays === 'Local stream' && !local) throw new Error('Add the local stream address, or set Live mode to play YouTube.');
+  const vkey = String(o.videoKey || '').trim();
+  if (vkey && !VIDEO_KEY_RE.test(vkey)) throw new Error('That doesn\'t look like a Google API key. It starts with AIza and is 39 characters long.');
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
     setSetting_('Church Name', name);
@@ -1294,6 +1312,7 @@ function saveChurchSettings(o, token) {
     setSetting_('Live YouTube', yt);
     setSetting_('Live Local Stream', local);
     setSetting_('Live Plays', o.livePlays === 'Local stream' ? 'Local stream' : 'YouTube');
+    setSetting_('Google API Key', vkey);
     tzCache_ = null;
   } finally { lock.releaseLock(); }
   log_(me, 'Church settings', name);
@@ -1632,7 +1651,8 @@ function tvPayload_(d, dev, iso, live) {
   const t = at_(iso);
   const now = resolve_(dev, t, d);
   if (live && !t.preview) heartbeat_(dev, now);
-  return { t: t, now: now, screen: screen_(dev, now, t, d), weather: weather_() };
+  // videoKey: lets full-size previews and browser screens play video slides (see "Video in browser previews").
+  return { t: t, now: now, screen: screen_(dev, now, t, d), weather: weather_(), videoKey: videoKey_() };
 }
 
 /** A paired TV asking what to show. The device key is the only thing that identifies it. */

@@ -82,9 +82,49 @@ function draw(force){
   if(!force&&key===lastKey)return;
   lastKey=key;
   stage(renderScreen(D.screen,c,D.weather,{slideIndex:slideIndex}));
+  mountVideo();
+}
+/*
+ * Video slides. Drive only hands video files to Google's own pages, so they load through the Drive API with
+ * the church's (or the built-in) API key. The page redraws every minute; the playing video is kept and moved
+ * into the new slot, so it doesn't restart. If it can't load, it's removed and the still stays.
+ */
+var SCR_VIDEO_KEY='',curVideo=null;
+function dropVideo(){
+  if(!curVideo)return;
+  try{curVideo.pause();curVideo.removeAttribute('src');curVideo.load();}catch(e){}
+  if(curVideo.parentNode)curVideo.parentNode.removeChild(curVideo);
+  curVideo=null;
+}
+function mountVideo(){
+  var slot=document.querySelector('#stage .scr-vslot');
+  if(!slot){dropVideo();return;}
+  var id=slot.getAttribute('data-vid');
+  if(curVideo&&curVideo.getAttribute('data-vid')!==id)dropVideo();
+  if(!curVideo){
+    var v=document.createElement('video');
+    v.setAttribute('data-vid',id);v.muted=true;v.autoplay=true;v.playsInline=true;v.preload='auto';
+    v.onended=function(){
+      var n=D?D.screen.slides.length:0;
+      if(n>1){slideIndex++;lastSlideAt=Date.now();draw(false);}
+      else{try{v.currentTime=0;v.play();}catch(e){}}
+    };
+    v.onerror=function(){if(curVideo===v)dropVideo();};
+    v.src='https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media&key='+encodeURIComponent(SCR_VIDEO_KEY);
+    curVideo=v;
+  }
+  slot.appendChild(curVideo);
+  var p=curVideo.play();if(p&&p.catch)p.catch(function(){});
+}
+/* How long the current slide stays up: 12 seconds, or a "[full]" video up to 3 minutes (it moves on when it ends). */
+function slideMs(){
+  var s=D&&D.screen.slides,n=s?s.length:0;if(!n)return 12000;
+  var sl=s[slideIndex%n];
+  return sl&&sl.video&&sl.full&&SCR_VIDEO_KEY?180000:12000;
 }
 function show(r){
   var changed=!D||JSON.stringify(D.screen)!==JSON.stringify(r.screen);
+  SCR_VIDEO_KEY=r.videoKey||'';
   D=r;if(changed)slideIndex=0;
   tag(r.screen.device.name+' · '+r.now.mode+' · '+r.now.label+(PREVIEW?' · preview'+(r.t.preview?' of '+r.t.stamp:''):''));
   draw(true);
@@ -145,7 +185,7 @@ function poll(){
 
 /* ---------- start ---------- */
 setInterval(function(){
-  if(D&&D.screen.slides.length>1&&Date.now()-lastSlideAt>=12000){slideIndex++;lastSlideAt=Date.now();}
+  if(D&&D.screen.slides.length>1&&Date.now()-lastSlideAt>=slideMs()){slideIndex++;lastSlideAt=Date.now();}
   draw(false);
 },1000);
 addEventListener('resize',fit);

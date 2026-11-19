@@ -1070,7 +1070,7 @@ var COMMON_TZ=['America/New_York','America/Chicago','America/Denver','America/Ph
   'America/Puerto_Rico','America/Toronto','America/Vancouver','Europe/London','Australia/Sydney'];
 function chLoad(){var c=S.churchSettings||{};return {name:c.name||'',website:c.website||'',timeZone:c.timeZone||'America/Chicago',place:c.place||'',
   lat:c.lat==null?'':c.lat,lon:c.lon==null?'':c.lon,unit:c.unit||'F',messageLine:c.messageLineSet||'',noEvents:c.noEventsSet||'',dashboardAddress:c.dashboardAddress||'',
-  wifiName:c.wifiName||'',wifiPass:c.wifiPass||'',liveYouTube:c.liveYouTube||'',liveLocal:c.liveLocal||'',livePlays:c.livePlays||'YouTube'};}
+  wifiName:c.wifiName||'',wifiPass:c.wifiPass||'',liveYouTube:c.liveYouTube||'',liveLocal:c.liveLocal||'',livePlays:c.livePlays||'YouTube',videoKey:c.videoKey||''};}
 function chSite(){return String(chForm.website||'').trim().replace(/^https?:\/\//i,'').replace(/\/+$/,'');}
 function chMsgDefault(){var s=chSite();return s?'Watch '+s+' and your email for updates.':'';}
 function chEvDefault(){var s=chSite();return s?'See all events at '+s:'Nothing on the calendar this week.';}
@@ -1129,6 +1129,13 @@ function vChurch(){
     '<label class="f">Local stream (optional)<input type="text" data-cf="liveLocal" value="'+esc(f.liveLocal)+'" placeholder="rtsp://192.168.0.50:554/live" spellcheck="false"></label>'+
     '<label class="f">Live mode plays<select data-cf="livePlays"><option'+(f.livePlays!=='Local stream'?' selected':'')+'>YouTube</option><option'+(f.livePlays==='Local stream'?' selected':'')+'>Local stream</option></select></label></div>'+
     '<p class="muted small" style="margin:6px 0 0">YouTube opens in the YouTube app and runs 20 to 30 seconds behind. A local stream (RTSP or SRT from an encoder or vMix on the church network) plays inside the app with less delay; when it isn’t answering, Watch Live falls back to YouTube. Browser screens and previews can’t play either.</p></section>';
+
+  var builtIn=!!(S.churchSettings||{}).videoKeyBuiltIn;
+  h+='<section class="panel"><h3>Videos in full-size previews</h3>'+
+    '<p class="muted small" style="margin:0 0 8px">TVs always play video slides. Full-size previews and browser screens play them through Google’s Drive API, which needs an API key. '+
+    (builtIn?'Church Signage includes one, so this works without anything here.':'None is set, so those show videos as stills.')+'</p>'+
+    '<div class="fgrid"><label class="f">Your own Google API key (optional)<input type="text" data-cf="videoKey" value="'+esc(f.videoKey)+'" placeholder="'+(builtIn?'Using the built-in key':'AIza…')+'" spellcheck="false" autocomplete="off"></label></div>'+
+    '<p class="muted small" style="margin:6px 0 0">Only if you want to use your own: a key from Google Cloud limited to the Google Drive API. It can only read files already shared by link.</p></section>';
 
   h+='<section class="panel"><h3>Wording on the screens</h3><div class="fgrid">'+
     '<label class="f">Line under an emergency message<input type="text" data-cf="messageLine" value="'+esc(f.messageLine)+'" placeholder="'+esc(chMsgDefault()||'No line')+'"></label>'+
