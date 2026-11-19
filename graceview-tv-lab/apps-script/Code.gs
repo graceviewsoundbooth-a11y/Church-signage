@@ -1539,7 +1539,7 @@ function doPost(e) {
  */
 function panelApi_() {
   return {
-    act: act, getState: getState, signIn: signIn, signOut: signOut, inviteInfo: inviteInfo, acceptInvite: acceptInvite,
+    act: act, getState: getState, previewTv: previewTv, signIn: signIn, signOut: signOut, inviteInfo: inviteInfo, acceptInvite: acceptInvite,
     changePassword: changePassword, findPlace: findPlace, checkCalendars: checkCalendars, themeUsage: themeUsage,
     uploadSlide: uploadSlide, addTheme: addTheme, approvePairing: approvePairing, clearPlanningCenter: clearPlanningCenter,
     createThemeFolder: createThemeFolder, deleteLauncher: deleteLauncher, deleteRow: deleteRow, deleteTheme: deleteTheme,
@@ -1577,9 +1577,10 @@ function panelForSite_(p) {
   Object.keys(p).forEach(function (k) { if (k !== 'app') q[k] = String(p[k]); });
   q.exec = ScriptApp.getService().getUrl();
   q.site = true;
-  const t = HtmlService.createTemplateFromFile('Panel');
+  // "?tv=ID" is a screen's full-size preview (the dashboard's Full size button); anything else is the dashboard.
+  const t = HtmlService.createTemplateFromFile(p.tv ? 'Tv' : 'Panel');
   t.params = JSON.stringify(q).replace(/</g, '\\u003c');
-  const out = { html: t.evaluate().getContent(), title: (settings_()['Church Name'] || 'Church') + ' Signage' };
+  const out = { html: t.evaluate().getContent(), title: p.tv ? 'Preview: ' + p.tv : (settings_()['Church Name'] || 'Church') + ' Signage' };
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
 }
 /** Where people open the dashboard: the church's own address (Church page) if set, else the Google link. */

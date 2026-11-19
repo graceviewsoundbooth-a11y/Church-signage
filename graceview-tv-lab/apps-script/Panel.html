@@ -253,6 +253,8 @@ function call(fn,args,okMsg,after){
     .withFailureHandler(fail).act(fn,args.concat([TOKEN]),preview,TOKEN);
 }
 function can(p){return !p||(S.perms||[]).indexOf(p)>=0;}
+/* Full-size previews open where the dashboard was opened: the church's own page (no multi-account error), or Google's link. */
+function previewBase(){return P.site?String(location.href).split(/[?#]/)[0]:S.url;}
 
 /* ---------- shared rules (same as the server) ---------- */
 function dayset(day){if(day==='Daily')return [0,1,2,3,4,5,6];if(day==='Weekdays')return [1,2,3,4,5];if(day==='Weekends')return [0,6];var i=DAYS.indexOf(day);return i<0?[]:[i];}
@@ -330,7 +332,7 @@ function vNow(){
 }
 function card(d){
   var src=d.now.source==='Special Date'?'Special':d.now.source;
-  var link=S.url+'?tv='+encodeURIComponent(d.id)+(S.t.preview?'&at='+encodeURIComponent(preview):'');
+  var link=previewBase()+'?tv='+encodeURIComponent(d.id)+(S.t.preview?'&at='+encodeURIComponent(preview):'');
   return '<article class="card"><div class="tvbox">'+renderScreen(d.screen,clk(),S.weather,{qr:false})+'</div><div class="cb">'+
     '<div class="ch"><h3>'+esc(d.name)+'</h3><span class="chip '+esc(src)+'">'+esc(d.now.mode)+'</span></div>'+
     '<p class="why">'+esc(d.now.label)+'</p>'+
@@ -926,7 +928,7 @@ function vDevices(){
   h+='<div class="tbl"><table><thead><tr><th>Screen</th><th>Kind</th><th>Theme</th><th>Showing now</th><th>Home screen</th><th>Status</th><th>IP address</th><th>Model / app</th><th></th></tr></thead><tbody>'+
     S.devices.map(function(d){
       var src=d.now.source==='Special Date'?'Special':d.now.source;
-      var link=S.url+'?tv='+encodeURIComponent(d.id);
+      var link=previewBase()+'?tv='+encodeURIComponent(d.id);
       var del=pendingDelete==='dev:'+d.id;
       return '<tr><td><b>'+esc(d.name)+'</b>'+(d.location?'<div class="muted small">'+esc(d.location)+'</div>':'')+'</td>'+
         '<td>'+esc(d.profile)+'</td><td>'+esc(d.defaultTheme)+'</td>'+

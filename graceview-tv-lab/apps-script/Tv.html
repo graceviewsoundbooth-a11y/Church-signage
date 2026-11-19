@@ -31,6 +31,25 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden}
  *   "?tv=ID[&at=…]"      a preview for people signed in to the panel. It never counts as the TV checking in.
  */
 var P=JSON.parse(document.getElementById('params').textContent||'{}');
+/* Opened through the church's website (P.site): calls go to the web app's API, without the browser's Google accounts. */
+if(P.site&&P.exec&&(typeof google==='undefined'||!google.script||!google.script.run)){
+  (function(){
+    function runner(ok,fail){
+      return new Proxy({},{get:function(t,k){
+        if(k==='withSuccessHandler')return function(f){return runner(f,fail);};
+        if(k==='withFailureHandler')return function(f){return runner(ok,f);};
+        return function(){
+          fetch(P.exec,{method:'POST',credentials:'omit',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'panel',fn:String(k),args:Array.prototype.slice.call(arguments)})})
+            .then(function(r){return r.json();})
+            .then(function(j){if(j&&j.ok){if(ok)ok(j.result);}else if(fail)fail({message:(j&&j.error)||'Something went wrong.'});})
+            .catch(function(){if(fail)fail({message:'No connection'});});
+        };
+      }});
+    }
+    window.google={script:{}};
+    Object.defineProperty(window.google.script,'run',{get:function(){return runner(null,null);}});
+  })();
+}
 var PREVIEW=!!P.tv;
 var DEVICE_KEY='gvlab-device', PANEL_KEY='gvlab-token';
 var D=null,slideIndex=0,lastSlideAt=Date.now(),lastKey='',pairing=null,pollTimer=null,loadTimer=null;
