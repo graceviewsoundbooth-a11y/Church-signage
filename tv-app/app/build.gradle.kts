@@ -30,9 +30,10 @@ android {
         versionCode = ((System.currentTimeMillis() / 1000 - 1767225600L) / 60).toInt()
         versionName = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy.MM.dd.HHmm"))
         buildConfigField("String", "GOOGLE_API_KEY", "\"${localProps.getProperty("google.apiKey", "")}\"")
-        // Church Signage: the dashboard (lab web app) this TV pairs with. Not a secret.
+        // Church Signage: the dashboard web app this TV pairs with (Graceview Signage 2.0). Not a secret.
+        // lab.url in local.properties points a build somewhere else (the test dashboard, another church).
         val labUrl = localProps.getProperty("lab.url",
-            "https://script.google.com/macros/s/AKfycbz1e2aevuTTBZJMOdzksVbK2BqcyRBR2ffS8R-IDmJ03vUMJ50jZRt7X02YV9AmoriWtQ/exec")
+            "https://script.google.com/macros/s/AKfycbxyaLwdIBo2LVLXFnOlm0xiw_nCcXljc2EcQ84BenlQU0ODyWaA7AfnwTywzVuQVhhS6w/exec")
         buildConfigField("String", "LAB_URL", "\"$labUrl\"")
     }
 

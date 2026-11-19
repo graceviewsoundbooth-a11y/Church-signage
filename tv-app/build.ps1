@@ -38,15 +38,17 @@ if (-not (Test-Path (Join-Path $gradleDir 'bin\gradle.bat'))) {
     Remove-Item $zip
 }
 
-# local.properties: keep the API key, make sure sdk.dir is set
+# local.properties: keep the API key and any lab.url (another dashboard), make sure sdk.dir is set
 $lp = Join-Path $here 'local.properties'
 $key = ''
+$keep = @()
 if (Test-Path $lp) {
     $m = Select-String -Path $lp -Pattern '^google\.apiKey=(.*)$' | Select-Object -First 1
     if ($m) { $key = $m.Matches[0].Groups[1].Value.Trim() }
+    $keep = @(Get-Content $lp | Where-Object { $_ -match '^lab\.url=' })
 }
 $sdkEsc = $sdk.Replace('\', '\\').Replace(':', '\:')
-Set-Content -Encoding ascii $lp "sdk.dir=$sdkEsc`ngoogle.apiKey=$key"
+Set-Content -Encoding ascii $lp (@("sdk.dir=$sdkEsc", "google.apiKey=$key") + $keep)
 if (-not $key) { Write-Warning 'google.apiKey is empty in local.properties. The app will build but show "API key is missing".' }
 
 Push-Location $here
