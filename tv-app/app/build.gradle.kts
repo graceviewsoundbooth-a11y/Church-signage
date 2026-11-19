@@ -1,6 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.io.File
 import java.util.Properties
 
 plugins {
@@ -42,16 +43,20 @@ android {
      * %LOCALAPPDATA%\church-signage-keys\signing.properties, or wherever CS_SIGNING_PROPS points.
      * Every update must be signed with the same key, or TVs have to uninstall to update: back it up.
      */
+    val signingPropsFile = file(System.getenv("CS_SIGNING_PROPS")
+        ?: (System.getenv("LOCALAPPDATA") ?: System.getProperty("user.home")) + "/church-signage-keys/signing.properties")
     val signingProps = Properties().apply {
-        val path = System.getenv("CS_SIGNING_PROPS")
-            ?: (System.getenv("LOCALAPPDATA") ?: System.getProperty("user.home")) + "/church-signage-keys/signing.properties"
-        val f = file(path)
-        if (f.exists()) f.inputStream().use { load(it) }
+        if (signingPropsFile.exists()) signingPropsFile.inputStream().use { load(it) }
+    }
+    // The key file as written in signing.properties, or (when the folder was copied to another computer,
+    // where that path doesn't exist) the file of the same name next to signing.properties.
+    val keyFile = signingProps.getProperty("storeFile")?.let { p ->
+        file(p).takeIf { it.exists() } ?: File(signingPropsFile.parentFile, File(p).name)
     }
     signingConfigs {
-        if (signingProps.getProperty("storeFile") != null) {
+        if (keyFile != null) {
             create("release") {
-                storeFile = file(signingProps.getProperty("storeFile"))
+                storeFile = keyFile
                 storePassword = signingProps.getProperty("storePassword")
                 keyAlias = signingProps.getProperty("keyAlias")
                 keyPassword = signingProps.getProperty("keyPassword")

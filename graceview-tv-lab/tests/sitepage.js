@@ -1,0 +1,54 @@
+// The dashboard opened through the loader: google.script.run is replaced by calls to the web app's API.
+const vm=require('vm'),fs=require('fs');const noop=()=>{};
+const els={};const el=id=>els[id]||(els[id]={className:'',style:{},innerHTML:'',textContent:'',hidden:false,dataset:{},setAttribute:noop,querySelectorAll:()=>[]});
+const reqs=[];let reply=null;
+const fetch=(url,o)=>{reqs.push({url,o});const r=reply;return Promise.resolve(r instanceof Error?Promise.reject(r):{json:()=>Promise.resolve(r)});};
+const ctx={console,Proxy,Promise,setInterval:noop,setTimeout:(f)=>f(),clearTimeout:noop,addEventListener:noop,localStorage:{getItem:()=>'',setItem:noop,removeItem:noop},Intl,scrollTo:noop,fetch,
+  document:{addEventListener:noop,getElementById:id=>id==='params'?{textContent:JSON.stringify({site:true,exec:'https://script.google.com/macros/s/EXEC/exec'})}:(['busy','toast','who','nav','main','ovBtn','brand','modeBtn'].includes(id)?el(id):null),querySelector:()=>null,querySelectorAll:()=>[]}};
+ctx.window=ctx;
+vm.createContext(ctx);
+vm.runInContext(fs.readFileSync(process.argv[2],'utf8')+'\n;\n'+fs.readFileSync(process.argv[3],'utf8'),ctx);
+const ok=(l,c)=>console.log((c?'PASS ':'FAIL ')+l);
+const tick=()=>new Promise(r=>setImmediate(r));
+(async()=>{
+  ok('the page installs its own google.script.run', ctx.google&&ctx.google.script&&typeof ctx.google.script.run.getState==='function');
+  reqs.length=0;reply={ok:true,result:{state:'SignIn',church:'Graceview Baptist Church'}};
+  let got=null,err=null;
+  ctx.google.script.run.withSuccessHandler(r=>got=r).withFailureHandler(e=>err=e).getState('', 'TOK');
+  await tick();await tick();
+  const q=reqs[0];
+  ok('it POSTs to the web app', q&&q.url==='https://script.google.com/macros/s/EXEC/exec'&&q.o.method==='POST');
+  ok('without the browser’s Google accounts', q.o.credentials==='omit');
+  ok('as plain text (no extra browser check first)', /^text\/plain/.test(q.o.headers['Content-Type']));
+  ok('with the call’s name and arguments', JSON.stringify(JSON.parse(q.o.body))==='{"action":"panel","fn":"getState","args":["","TOK"]}');
+  ok('the success handler gets the result', got&&got.church==='Graceview Baptist Church'&&err===null);
+  got=null;reply={ok:false,error:'Wrong email or password.'};
+  ctx.google.script.run.withSuccessHandler(r=>got=r).withFailureHandler(e=>err=e).signIn('a@b.c','x');
+  await tick();await tick();
+  ok('a server error reaches the failure handler as a message', err&&err.message==='Wrong email or password.'&&got===null);
+  err=null;reply=new Error('offline');
+  ctx.google.script.run.withSuccessHandler(r=>got=r).withFailureHandler(e=>err=e).getState('','TOK');
+  await tick();await tick();await tick();
+  ok('no connection: a plain message, not a crash', err&&/Couldn’t reach|Couldn't reach/.test(err.message));
+  reqs.length=0;reply={ok:true,result:'x.png'};
+  ctx.google.script.run.withSuccessHandler(noop).withFailureHandler(noop).uploadSlide('Church','a.png','image/png','QUJD','','','TOK');
+  await tick();
+  ok('uploads go the same way', JSON.parse(reqs[0].o.body).fn==='uploadSlide'&&JSON.parse(reqs[0].o.body).args[3]==='QUJD');
+  // The loader's head start: the first state was asked for while the page loaded.
+  reqs.length=0;got=null;
+  ctx.__csFirst={token:'TOK',p:Promise.resolve({ok:true,result:{state:'Early'}})};
+  ctx.google.script.run.withSuccessHandler(r=>got=r).withFailureHandler(noop).getState('','TOK');
+  await tick();await tick();
+  ok('the first getState uses the loader’s answer, no new request', got&&got.state==='Early'&&reqs.length===0);
+  ctx.google.script.run.withSuccessHandler(r=>got=r).withFailureHandler(noop).getState('','TOK');
+  await tick();
+  ok('only once', reqs.length===1);
+  reqs.length=0;ctx.__csFirst={token:'OLD',p:Promise.resolve({ok:true,result:{state:'Early'}})};
+  ctx.google.script.run.withSuccessHandler(noop).withFailureHandler(noop).getState('','NEW');
+  await tick();
+  ok('not when the sign-in changed', reqs.length===1);
+  reqs.length=0;ctx.__csFirst={token:'TOK',p:Promise.resolve({ok:true,result:{}})};
+  ctx.google.script.run.withSuccessHandler(noop).withFailureHandler(noop).getState('2026-11-22T10:45','TOK');
+  await tick();
+  ok('not for a preview time', reqs.length===1);
+})();

@@ -57,7 +57,8 @@ try {
     if ($Release -and -not (Test-Path (Join-Path $env:LOCALAPPDATA 'church-signage-keys\signing.properties')) -and -not $env:CS_SIGNING_PROPS) {
         throw 'No signing key. Run make-signing-key.ps1 once (and back up the folder it makes).'
     }
-    $tasks = if ($Test) { @(':core:test', ':app:testDebugUnitTest', $build) } else { @($build) }
+    # @(...) around the if: otherwise one task comes back as a plain string, and @tasks would pass it letter by letter.
+    $tasks = @(if ($Test) { ':core:test', ':app:testDebugUnitTest', $build } else { $build })
     & (Join-Path $gradleDir 'bin\gradle.bat') --no-daemon --project-cache-dir (Join-Path $out '.gradle') @tasks
     if ($LASTEXITCODE -ne 0) { throw "Gradle build failed ($LASTEXITCODE)" }
 } finally { Pop-Location }
