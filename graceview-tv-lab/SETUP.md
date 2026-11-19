@@ -110,6 +110,7 @@ Paired TVs pick up changes on their next check-in. The weather refreshes right a
 
 ## Known limits
 
+- **"Sorry, unable to open the file at this time" (Google Drive page):** the browser is signed into more than one Google account, and the link picked up a `/u/1/`, `/u/4/`… part. Open the dashboard in a private or Incognito tab (or sign out of the extra accounts). Nobody needs a Google account to use it.
 - Apps Script is slower than a real server: a save takes 1 to 3 seconds; TVs see changes within about 15 seconds.
 - Browser screens can't play the live feed or video from Drive (videos show as a still). The native app plays both.
 - Calendar times without a zone in the feed are read in the church's time zone.

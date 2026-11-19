@@ -21,3 +21,7 @@ Suggested order when picked up: paging; then clean-up time and nightly sleep; th
 - **Website tiles need a browser app on the TV.** Stock Google TV has none. Add a browser to stick setup, or have the dashboard warn when a TV hasn't reported one.
 - **Green Room setup in the dashboard:** Planning Center service type, ProPresenter and Avantis addresses, and the mic map, connected to the native app's existing dashboard.
 - **Text slides** were dropped on purpose (2026-11-16): slides are uploaded files only.
+
+## Dashboard address
+
+- Browsers signed into several Google accounts open the Apps Script link as `/u/N/` and get Google Drive's "Sorry, unable to open the file" page (seen 2026-11-18 on a phone). Workaround: a private tab. Fix: give the dashboard its own address on a small free host, so it doesn't go through Google's account picker. Do it with the public link for other churches.
