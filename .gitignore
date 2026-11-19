@@ -7,3 +7,6 @@ reference/
 **/local.properties
 *.keystore
 *.jks
+
+# Built apps (made by tv-app/build.ps1)
+dist/

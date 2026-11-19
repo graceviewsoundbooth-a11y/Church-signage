@@ -36,6 +36,34 @@ android {
         buildConfigField("String", "LAB_URL", "\"$labUrl\"")
     }
 
+    /*
+     * Release signing. The key lives outside the project (make-signing-key.ps1 makes it), in
+     * %LOCALAPPDATA%\church-signage-keys\signing.properties, or wherever CS_SIGNING_PROPS points.
+     * Every update must be signed with the same key, or TVs have to uninstall to update: back it up.
+     */
+    val signingProps = Properties().apply {
+        val path = System.getenv("CS_SIGNING_PROPS")
+            ?: (System.getenv("LOCALAPPDATA") ?: System.getProperty("user.home")) + "/church-signage-keys/signing.properties"
+        val f = file(path)
+        if (f.exists()) f.inputStream().use { load(it) }
+    }
+    signingConfigs {
+        if (signingProps.getProperty("storeFile") != null) {
+            create("release") {
+                storeFile = file(signingProps.getProperty("storeFile"))
+                storePassword = signingProps.getProperty("storePassword")
+                keyAlias = signingProps.getProperty("keyAlias")
+                keyPassword = signingProps.getProperty("keyPassword")
+            }
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false // the code is small; shrinking risks breaking reflection-based parsing
+            signingConfig = signingConfigs.findByName("release")
+        }
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true

@@ -26,11 +26,13 @@ On a phone the sections become a bar at the bottom. The corner button switches l
 
 ## Install (about 10 minutes, once)
 
-1. Open the **Graceview TV Lab** Sheet, then choose **Extensions > Apps Script**.
+A new church starts from a **blank Google Sheet** in the Google account that will own everything (a church account is best, not one person's). The app adds every tab it needs the first time it runs, with headings, checkboxes, dropdowns, a starter "Church" theme and two override presets; tabs that already exist are never changed.
+
+1. Open the Sheet, then choose **Extensions > Apps Script**.
 2. Replace everything in `Code.gs` with `apps-script/Code.gs`.
 3. Add three HTML files with **+ > HTML**, named exactly `Panel`, `Tv` and `Screen` (the editor adds `.html`), and paste each file in.
 4. **Project Settings** (gear icon): set the time zone to **(GMT-06:00) Central Time - Chicago**.
-5. Choose **authorize** in the function list next to **Run**, click **Run**, and approve every permission (the Sheet, Google Drive, outside requests for weather and calendars). Google won't always ask on its own when a permission is added, so do this again whenever the code starts using something new.
+5. Choose **authorize** in the function list next to **Run**, click **Run**, and approve every permission (the Sheet, Google Drive, outside requests for weather and calendars). On a blank Sheet this also adds the tabs (the log says which). Google won't always ask on its own when a permission is added, so do this again whenever the code starts using something new.
 6. **Deploy > New deployment > Web app**:
    - **Execute as:** Me
    - **Who has access:** Anyone (the TV app can't sign in to Google; the dashboard's own sign-in and TV pairing protect everything)
@@ -63,7 +65,17 @@ On **Settings → People**, choose **Invite someone**, pick a role and send the 
 
 **Now page:** a live picture of every TV, plus buttons to preview the schedule at set times (Sunday 9:45 countdown, Sunday 10:45 live, the Wednesday overlap, Thanksgiving, Christmas Eve).
 
-**The native app** (`../tv-app`, app ID `org.graceview.signage.lab`): installs alongside the live Graceview TV app. It asks the dashboard for its setup every 15 seconds and keeps the last good copy, so it keeps running if the internet drops. The schedule, launcher, power and transition logic are the original app's. Build and emulator notes are in `../README.md`.
+**Installing the app on a stick** (about 10 minutes each, from a Windows computer on the same network):
+
+1. On the stick, turn on developer options and **Wireless debugging** (Google TV) or **ADB debugging** (Fire TV), and note its IP address.
+2. Run `tv-app/setup-stick.ps1 -Ip <address>` (Google TV wireless debugging also needs `-Port`, and `-PairPort`/`-PairCode` the first time). It installs `dist/church-signage.apk`, grants what the scheduler needs, keeps the screen awake, sets up TV power control (CEC) and makes Church Signage the TV's home. On Google TV, add **-DisableStockLauncher** so the remote's Home button always lands on Church Signage (an Android update can turn the stock home back on; run the script again).
+3. The app shows a code: on **Screens**, choose **+ Add a screen** and type it.
+
+A stick can have both 1.0 and 2.0 installed; only the one the script set up last is the TV's home. To switch a TV back to 1.0: `setup-stick.ps1 -Ip <address> -Pkg org.graceview.tv -SkipInstall` (and run it again without `-Pkg` to return to 2.0).
+
+**Building the app:** `tv-app/build.ps1 -Release` makes the signed `dist/church-signage.apk`. It needs the release signing key, made once with `tv-app/make-signing-key.ps1` and kept in `%LOCALAPPDATA%\church-signage-keys`. **Back that folder up somewhere private**: every update must be signed with the same key, or each TV has to uninstall the app and pair again to update.
+
+**The native app** (`../tv-app`, app ID `org.graceview.signage.lab`, shown on the TV as "Church Signage"): installs alongside the live Graceview TV app. It asks the dashboard for its setup every 15 seconds and keeps the last good copy, so it keeps running if the internet drops. The schedule, launcher, power and transition logic are the original app's. Build and emulator notes are in `../README.md`.
 
 ## Schedule and overrides
 

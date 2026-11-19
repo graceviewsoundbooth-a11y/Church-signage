@@ -30,13 +30,102 @@ const ROLES = ['Admin', 'Staff', 'Limited']; // roles the Owner/Admins can give 
 function authorize() {
   if (ScriptApp.requireAllScopes) ScriptApp.requireAllScopes(ScriptApp.AuthMode.FULL);
   DriveApp.getRootFolder().getName();
-  console.log('All permissions are approved.');
+  const made = setupSheet();
+  console.log('All permissions are approved.' + (made.length ? ' Added the Sheet tabs: ' + made.join(', ') + '.' : ''));
+}
+
+/* ---------- A new church's Sheet ----------
+ * A church starts from a blank Google Sheet. The first time the app runs (authorize, or opening the
+ * dashboard before setup), it adds every tab it needs with its headings, checkboxes and dropdowns, plus
+ * a starter "Church" theme and two override presets. Tabs that already exist are never changed.
+ */
+const SHEET_LAYOUT = [
+  { name: 'Settings', head: ['Setting', 'Value'], rows: [['Fallback Theme', 'Church']] },
+  { name: 'Override', head: ['Active', 'Devices', 'Mode', 'Theme', 'Message', 'Ends At', 'Started By', 'Started At'],
+    rows: [[false, 'ALL SIGNAGE', 'Message', '', '', '', '', '']], checks: ['Active'], modes: ['Mode'], text: ['Ends At', 'Started At'] },
+  { name: 'Weekly', head: ['Enabled', 'Day', 'Start', 'End', 'Devices', 'Mode', 'Theme', 'Note'],
+    checks: ['Enabled'], days: ['Day'], modes: ['Mode'], text: ['Start', 'End'] },
+  { name: 'Special Dates', head: ['Enabled', 'Name', 'From', 'To', 'Start', 'End', 'Devices', 'Mode', 'Theme'],
+    checks: ['Enabled'], modes: ['Mode'], text: ['From', 'To', 'Start', 'End'] },
+  { name: 'Devices', head: ['Device ID', 'Name', 'Location', 'Profile', 'Hardware', 'Default Theme', 'Default Mode', 'Mute Live', 'Wayfinding',
+    'Last Seen', 'App Version', 'Now Showing', 'Paired At', 'Paired By', 'Launcher', 'IP Address'],
+    checks: ['Mute Live', 'Wayfinding'], profiles: ['Profile'], modes: ['Default Mode'], text: ['Device ID', 'Last Seen', 'App Version', 'Paired At', 'IP Address'] },
+  { name: 'Themes', head: ['Theme', 'Display Name', 'Main', 'Accent', 'Logo URL', 'Wayfinding Left', 'Wayfinding Right', 'QR Label', 'QR Link',
+    'Wi-Fi Name', 'Wi-Fi Password', 'Calendar', 'Calendar Hide', 'Slides Folder', 'Main Text', 'Accent Text'],
+    rows: [['Church', '', '#333333', '#555555', '', '', '', 'Info', '', '', '', 'https://calendar.google.com/calendar/ical/en.usa%23holiday%40group.v.calendar.google.com/public/basic.ics', '', '', '#FFFFFF', '#FFFFFF']],
+    text: ['Main', 'Accent', 'Main Text', 'Accent Text'] },
+  { name: 'Launchers', head: ['Name', 'Tiles', 'Idle Minutes', 'Notes'] },
+  { name: 'Green Room', head: ['Setting', 'Value', '', ''],
+    rows: [['Planning Center Service Type ID', '', '', ''], ['Mic Assignment Source', 'Position name', '', ''], ['Plan Note Category', '', '', ''],
+           ['Hide Declined People', 'TRUE', '', ''], ['ProPresenter Address', '', '', ''], ['ProPresenter Timer Name', '', '', ''],
+           ['Avantis Address', '', '', ''], ['Avantis MIDI Base Channel', '12', '', ''], ['', '', '', ''],
+           ['Mic Label', 'Avantis Input Channel', 'Notes', 'Planning Center Position']] },
+  { name: 'Presets', head: ['Name', 'Devices', 'Mode', 'Theme', 'Message'],
+    rows: [['Weather closure', 'ALL SIGNAGE', 'Message', '', 'We\'re closed today because of the weather. Stay safe.'],
+           ['Service canceled', 'ALL SIGNAGE', 'Message', '', 'Today\'s service is canceled.']], modes: ['Mode'] },
+  { name: 'Users', head: ['Email', 'Name', 'Role', 'Themes', 'Devices', 'Status', 'Invited By', 'Invited At', 'Last Sign-in'], text: ['Invited At', 'Last Sign-in'] },
+  { name: 'Activity', head: ['Time', 'User', 'Action', 'Details'], text: ['Time'] },
+  { name: 'Lists', head: ['Modes', 'Days', 'Profiles', 'Roles', 'Targets'] },
+];
+
+/** Adds any missing tabs (see SHEET_LAYOUT). Returns the names it added. Safe to run any time. */
+function setupSheet() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try { return setupSheet_(); } finally { lock.releaseLock(); }
+}
+/** The work of setupSheet, for callers that already hold the script lock. */
+function setupSheet_() {
+  {
+    const book = book_();
+    const have = {};
+    book.getSheets().forEach(function (s) { have[s.getName()] = s; });
+    const missing = SHEET_LAYOUT.filter(function (t) { return !have[t.name]; });
+    if (!missing.length) return [];
+    // The dropdown lists, first: the other tabs' dropdowns point at them.
+    let lists = have.Lists;
+    if (!lists) {
+      lists = book.insertSheet('Lists');
+      const cols = [['Modes'].concat(MODES), ['Days'].concat(DAY_VALUES), ['Profiles'].concat(PROFILES), ['Roles'].concat(ROLES), ['Targets', 'ALL', 'ALL SIGNAGE', 'CLASSROOMS']];
+      cols.forEach(function (c, j) { lists.getRange(1, j + 1, c.length, 1).setValues(c.map(function (x) { return [x]; })); });
+      lists.setFrozenRows(1);
+      lists.getRange(1, 1, 1, cols.length).setFontWeight('bold');
+    }
+    const listRule = function (col, n) {
+      return SpreadsheetApp.newDataValidation().requireValueInRange(lists.getRange(2, col, n, 1), true).setAllowInvalid(true).build();
+    };
+    const ROWS = 200; // rows that get checkboxes and dropdowns ready
+    missing.forEach(function (t) {
+      if (t.name === 'Lists') return;
+      const sh = book.insertSheet(t.name);
+      const col = function (h) { return t.head.indexOf(h) + 1; };
+      (t.text || []).forEach(function (h) { sh.getRange(2, col(h), ROWS, 1).setNumberFormat('@'); });
+      sh.getRange(1, 1, 1, t.head.length).setValues([t.head]).setFontWeight('bold');
+      sh.setFrozenRows(1);
+      (t.checks || []).forEach(function (h) { sh.getRange(2, col(h), ROWS, 1).insertCheckboxes(); });
+      (t.modes || []).forEach(function (h) { sh.getRange(2, col(h), ROWS, 1).setDataValidation(listRule(1, MODES.length)); });
+      (t.days || []).forEach(function (h) { sh.getRange(2, col(h), ROWS, 1).setDataValidation(listRule(2, DAY_VALUES.length)); });
+      (t.profiles || []).forEach(function (h) { sh.getRange(2, col(h), ROWS, 1).setDataValidation(listRule(3, PROFILES.length)); });
+      if (t.rows && t.rows.length) sh.getRange(2, 1, t.rows.length, t.head.length).setValues(t.rows);
+      if (t.name === 'Green Room') sh.getRange(11, 1, 1, 4).setFontWeight('bold');
+      delete tabMemo_[t.name];
+      dirtyTabs_[t.name] = true;
+    });
+    // A brand-new Sheet's own empty "Sheet1" isn't needed any more.
+    book.getSheets().forEach(function (s) {
+      if (/^(Sheet|Hoja|Feuille|Tabelle|Página)\s?1$/i.test(s.getName()) && s.getLastRow() === 0 && book.getSheets().length > 1) book.deleteSheet(s);
+    });
+    saveTabs_();
+    return missing.map(function (t) { return t.name; });
+  }
 }
 
 function doGet(e) {
   // Asks anyone opening the app to approve permissions they haven't approved yet (Drive, for example).
   if (ScriptApp.requireAllScopes) ScriptApp.requireAllScopes(ScriptApp.AuthMode.FULL);
   const p = (e && e.parameter) || {};
+  // Before first-time setup, make sure a new church's blank Sheet has every tab.
+  if (!normEmail_(settings_()['Owner Email'])) { try { setupSheet(); } catch (err) { console.error('setupSheet: ' + err); } }
   if (p.app === 'panel') return panelForSite_(p);
   // "?screen" = a TV (pairs itself, then shows its device). "?tv=ID" = a preview for signed-in people.
   const isTv = !!p.tv || Object.prototype.hasOwnProperty.call(p, 'screen');
@@ -109,6 +198,9 @@ function tabValues_(names) {
     } catch (err) { c = null; }
     need.forEach(function (n) {
       let ver = vers['tabv:' + n];
+      // A tab this request is still writing to is read from the Sheet and not cached: a later write in
+      // the same request doesn't give it a new version, so a cached copy here would go stale.
+      if (dirtyTabs_[n]) { const shD = tabSheet_(n); tabMemo_[n] = shD ? shD.getDataRange().getDisplayValues() : null; return; }
       const hit = ver && hits['tab:' + n + ':' + ver];
       if (hit) { try { tabMemo_[n] = JSON.parse(hit); return; } catch (err) { /* read it below */ } }
       const sh = tabSheet_(n);
@@ -1259,8 +1351,13 @@ function setupChurch(info) {
     const church = String(info.church || '').trim(), name = String(info.name || '').trim();
     if (!church) throw new Error('Enter the church name.');
     if (!name) throw new Error('Enter your name.');
+    setupSheet_();
     setPassword_(google, info.password);
     setSetting_('Church Name', church);
+    // The starter theme shows the church's name on screens.
+    data_().themes.forEach(function (th) {
+      if (!String(th['Display Name'] || '').trim()) sheet_('Themes').getRange(th._row, 2).setValue(church);
+    });
     setSetting_('Owner Name', name);
     setSetting_('Owner Email', google);
     setSetting_('Set Up', "'" + stampNow_());

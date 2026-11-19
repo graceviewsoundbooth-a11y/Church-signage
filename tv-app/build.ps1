@@ -1,7 +1,9 @@
-# Builds the Graceview TV app and copies the APK to ..\dist\graceview-tv.apk
+# Builds the Church Signage TV app.
 # Run from a normal PowerShell window:  powershell -ExecutionPolicy Bypass -File build.ps1
+#   (no switches)  a test build:            ..\dist\graceview-tv.apk
+#   -Release       the signed build for TVs: ..\dist\church-signage.apk  (needs make-signing-key.ps1 once)
 # Add -Test to run the unit tests first (the build stops if any fail).
-param([switch]$Test)
+param([switch]$Test, [switch]$Release)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -49,14 +51,24 @@ if (-not $key) { Write-Warning 'google.apiKey is empty in local.properties. The 
 
 Push-Location $here
 try {
-    $tasks = if ($Test) { @(':core:test', ':app:testDebugUnitTest', ':app:assembleDebug') } else { @(':app:assembleDebug') }
+    $build = if ($Release) { ':app:assembleRelease' } else { ':app:assembleDebug' }
+    if ($Release -and -not (Test-Path (Join-Path $env:LOCALAPPDATA 'church-signage-keys\signing.properties')) -and -not $env:CS_SIGNING_PROPS) {
+        throw 'No signing key. Run make-signing-key.ps1 once (and back up the folder it makes).'
+    }
+    $tasks = if ($Test) { @(':core:test', ':app:testDebugUnitTest', $build) } else { @($build) }
     & (Join-Path $gradleDir 'bin\gradle.bat') --no-daemon --project-cache-dir (Join-Path $out '.gradle') @tasks
     if ($LASTEXITCODE -ne 0) { throw "Gradle build failed ($LASTEXITCODE)" }
 } finally { Pop-Location }
 
-$apk = Join-Path $out 'app\outputs\apk\debug\app-debug.apk'
 $dist = Join-Path (Split-Path $here) 'dist'
 New-Item -ItemType Directory -Force $dist | Out-Null
-Copy-Item $apk (Join-Path $dist 'graceview-tv.apk') -Force
+if ($Release) {
+    $apk = Join-Path $out 'app\outputs\apk\release\app-release.apk'
+    $name = 'church-signage.apk'
+} else {
+    $apk = Join-Path $out 'app\outputs\apk\debug\app-debug.apk'
+    $name = 'graceview-tv.apk'
+}
+Copy-Item $apk (Join-Path $dist $name) -Force
 Write-Host ''
-Write-Host "Built: $(Join-Path $dist 'graceview-tv.apk')" -ForegroundColor Green
+Write-Host "Built: $(Join-Path $dist $name)" -ForegroundColor Green

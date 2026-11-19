@@ -46,7 +46,7 @@
         android:allowBackup="false"
         android:banner="@drawable/banner"
         android:icon="@mipmap/ic_launcher"
-        android:label="Church Signage (Lab)"
+        android:label="Church Signage"
         android:theme="@style/Theme.Graceview">
 
         <activity
@@ -111,7 +111,7 @@
         <service
             android:name=".system.HomeKeyService"
             android:exported="true"
-            android:label="Graceview TV Home button"
+            android:label="Church Signage Home button"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />

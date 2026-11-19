@@ -1,12 +1,22 @@
 <#
 .SYNOPSIS
-  One-time setup for a Graceview TV stick (Fire TV or Google TV) over Wi-Fi ADB.
+  One-time setup for a Church Signage TV stick (Fire TV or Google TV) over Wi-Fi ADB.
 
 .DESCRIPTION
   Connects to the stick, installs or updates the app, and grants what the scheduler and
   launcher need: display over other apps, device admin (sleep), exact alarms, no battery
   limits, screensaver and display sleep off, and on Google TV the Home-button service.
   Prints a summary of what worked. Safe to run again; it only changes what's needed.
+
+  Sets up Church Signage 2.0 (app ID org.graceview.signage.lab) unless -Pkg says otherwise.
+  The app it sets up becomes the TV's home: the other version's Home-button service is
+  turned off, so 1.0 and 2.0 never fight over the Home button. To switch a TV back to 1.0:
+    powershell -ExecutionPolicy Bypass -File setup-stick.ps1 -Ip 192.168.1.50 -Pkg org.graceview.tv -SkipInstall
+  2.0 TVs pair with the code on screen (Screens > + Add a screen on the dashboard).
+
+.EXAMPLE
+  Church Signage 2.0 on a Google TV (after wireless debugging is paired):
+    powershell -ExecutionPolicy Bypass -File setup-stick.ps1 -Ip 192.168.1.60 -Port 41235
 
 .EXAMPLE
   Fire TV (ADB debugging on, port 5555):
@@ -37,16 +47,26 @@ param(
     # Google TV only: also disable the stock launcher so Home always lands on Graceview.
     # An OTA update may turn it back on; just run the script again.
     [switch]$DisableStockLauncher,
-    # Green Room TVs: ask for the Planning Center personal access token (application ID and
+    # 1.0 Green Room TVs: ask for the Planning Center personal access token (application ID and
     # secret) and store it encrypted on the stick. It is typed here, never read from a file.
-    [switch]$PlanningCenter
+    # (2.0 TVs get it from the dashboard: Settings > Green Room.)
+    [switch]$PlanningCenter,
+    # Which app: org.graceview.signage.lab (Church Signage 2.0, the default) or org.graceview.tv (1.0).
+    [ValidateSet('org.graceview.signage.lab', 'org.graceview.tv')]
+    [string]$Pkg = 'org.graceview.signage.lab'
 )
 
 # Continue, not Stop: adb writes normal progress to stderr, which PowerShell 5.1 treats as errors.
 $ErrorActionPreference = 'Continue'
-$Pkg = 'org.graceview.tv'
+# Both apps are built from the same code, so their parts keep the code's names (org.graceview.tv.…)
+# under each app's own ID: a part is "<app ID>/org.graceview.tv.<part>".
+$Ns = 'org.graceview.tv'
+$Is2 = $Pkg -eq 'org.graceview.signage.lab'
+$Other = if ($Is2) { 'org.graceview.tv' } else { 'org.graceview.signage.lab' }
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-if (-not $Apk) { $Apk = Join-Path (Split-Path $here) 'dist\graceview-tv.apk' }
+if (-not $Apk) {
+    $Apk = if ($Is2) { Join-Path (Split-Path $here) 'dist\church-signage.apk' } else { Join-Path (Split-Path $here) 'dist\graceview-tv.apk' }
+}
 
 # --- Find adb ---------------------------------------------------------------
 $adb = $null
@@ -120,22 +140,30 @@ if ($sdk -ge 31) {
 $out = Sh "dumpsys deviceidle whitelist +$Pkg"
 Note 'No battery limits' ($out -notmatch 'rror') ($out.Trim())
 
-$out = Sh "dpm set-active-admin $Pkg/.system.AdminReceiver"
+$admin = "$Pkg/$Ns.system.AdminReceiver"
+$out = Sh "dpm set-active-admin $admin"
 $admins = Sh 'dumpsys device_policy'
-Note 'Device admin (sleep for Off)' (($out -match 'Success') -or ($admins -match "$Pkg/.system.AdminReceiver")) ($out.Trim())
+Note 'Device admin (sleep for Off)' (($out -match 'Success') -or ($admins -match [regex]::Escape($admin))) ($out.Trim())
 
 if (-not $fire) {
-    $svc = "$Pkg/$Pkg.system.HomeKeyService"
+    # This app's Home-button service on; the other version's off (only one app may take Home).
+    $svc = "$Pkg/$Ns.system.HomeKeyService"
+    $otherSvc = "$Other/$Ns.system.HomeKeyService"
     $current = (Sh 'settings get secure enabled_accessibility_services').Trim()
-    if ($current -eq 'null' -or -not $current) { $new = $svc }
-    elseif ($current -split ':' -contains $svc) { $new = $current }
-    else { $new = "$current`:$svc" }
-    $null = Sh "settings put secure enabled_accessibility_services $new"
+    $list = @()
+    if ($current -and $current -ne 'null') { $list = @($current -split ':' | Where-Object { $_ -and $_ -ne $otherSvc -and $_ -ne $svc }) }
+    $list += $svc
+    $null = Sh ("settings put secure enabled_accessibility_services {0}" -f ($list -join ':'))
     $null = Sh 'settings put secure accessibility_enabled 1'
     Start-Sleep 2
-    $bound = Sh 'dumpsys accessibility'
-    # Older Android shortens the label in this output ("Graceview TV Home butt..."), so match the start.
-    Note 'Home button service' ($bound -match 'Bound services:\{[^}]*Graceview TV Home') 'accessibility service enabled'
+    $now = (Sh 'settings get secure enabled_accessibility_services').Trim()
+    Note 'Home button service' (($now -split ':') -contains $svc) 'accessibility service enabled'
+    if ($current -split ':' -contains $otherSvc) {
+        Note 'Other version''s Home button' (-not (($now -split ':') -contains $otherSvc)) "turned off for $Other"
+    }
+    # And the TV's default home app, for the cases the Home-button service doesn't cover (after a restart).
+    $out = Sh "cmd package set-home-activity $Pkg/$Ns.HomeAlias"
+    Note 'Default home app' ($out -notmatch 'rror|nknown') ($(if ($out.Trim()) { $out.Trim() } else { "set to $Pkg" }))
 
     if ($DisableStockLauncher) {
         foreach ($l in @('com.google.android.apps.tv.launcherx', 'com.google.android.tvlauncher')) {
@@ -194,7 +222,9 @@ foreach ($s in $settings) {
 Note 'Stay awake' $true 'the app also holds the screen on while signage shows'
 
 # --- Planning Center token (Green Room) -----------------------------------------
-if ($PlanningCenter) {
+if ($PlanningCenter -and $Is2) {
+    Note 'Planning Center token' $true '2.0 TVs get it from the dashboard (Settings > Green Room); nothing to do here'
+} elseif ($PlanningCenter) {
     Write-Host 'Planning Center personal access token (from api.planningcenteronline.com/oauth/applications, a view-only Services user).' -ForegroundColor Cyan
     $appId = Read-Host 'Application ID'
     $secure = Read-Host 'Secret' -AsSecureString
@@ -203,20 +233,23 @@ if ($PlanningCenter) {
         Note 'Planning Center token' $false 'not saved: the ID and secret should be letters and numbers only'
     } else {
         # Only the adb shell may send this broadcast (the receiver requires android.permission.DUMP).
-        $out = Sh ("am broadcast -n $Pkg/.system.TokenReceiver --es pcoAppId {0} --es pcoSecret {1}" -f $appId.Trim(), $secret.Trim())
+        $out = Sh ("am broadcast -n $Pkg/$Ns.system.TokenReceiver --es pcoAppId {0} --es pcoSecret {1}" -f $appId.Trim(), $secret.Trim())
         Note 'Planning Center token' ($out -match 'result=1') 'stored encrypted on the stick'
     }
     $secret = $null; $appId = $null
 }
 
 # --- Start the app ----------------------------------------------------------
-if ($Device) {
-    $null = Sh ("am start -n $Pkg/.MainActivity --es setDevice '{0}'" -f $Device.Replace("'", ''))
+if ($Is2) {
+    $null = Sh "am start -n $Pkg/$Ns.MainActivity"
+    Note 'Start app' $true 'pair it: type the code on the TV into Screens > + Add a screen'
+} elseif ($Device) {
+    $null = Sh ("am start -n $Pkg/$Ns.MainActivity --es setDevice '{0}'" -f $Device.Replace("'", ''))
     Start-Sleep 3
     $saved = Sh "run-as $Pkg cat shared_prefs/graceview.xml"
     Note 'Start app as TV name' ($saved -match [regex]::Escape(">$Device<")) "set to $Device"
 } else {
-    $null = Sh "am start -n $Pkg/.MainActivity"
+    $null = Sh "am start -n $Pkg/$Ns.MainActivity"
     Note 'Start app' $true 'pick this TV in "Which TV is this?" if it asks'
 }
 
