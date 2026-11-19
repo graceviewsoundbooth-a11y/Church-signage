@@ -30,6 +30,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 nav{display:flex;gap:4px;overflow-x:auto;padding:8px max(16px,env(safe-area-inset-left));background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
 nav button{border:0;background:none;padding:8px 14px;border-radius:8px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
 nav button.on{background:var(--sunk);color:var(--fg)}
+nav button.navset{margin-left:auto}
+.subnav{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 14px;border-bottom:1px solid var(--line)}
+.subnav button{border:0;background:none;padding:8px 12px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.subnav button.on{color:var(--fg);border-bottom-color:var(--fg)}
 main{max-width:1240px;margin:0 auto;padding:20px max(16px,env(safe-area-inset-right)) 60px max(16px,env(safe-area-inset-left));display:flex;flex-direction:column;gap:20px}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -133,7 +137,10 @@ var S=null, view='now', preview='', edit=null, pendingDelete=null, schedFilter='
 var themeForm=null, slideTheme=null, ov=null, ovConfirm=false;
 var DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 var VIEWS=[['now','Now',null],['devices','Devices',null],['override','Override','override'],['schedule','Schedule','schedule'],['themes','Themes','theme'],['slides','Slides','slides'],
-  ['activity','Activity','activity'],['launchers','Launchers','launchers'],['greenroom','Green Room','greenroom'],['people','People','users'],['church','Church','users'],['account','Account',null]];
+  ['launchers','Launchers','launchers'],['greenroom','Green Room','greenroom']];
+/* Settings: one menu item, with its own tabs. Each tab shows only to people allowed to use it. */
+var SETTINGS=[['church','Church','users'],['people','People','users'],['activity','Recent activity','activity'],['account','Your account',null]];
+var settingsLast='';
 var P=JSON.parse(document.getElementById('params').textContent||'{}');
 var INVITE=P.invite||'', INV=null, userEdit=null, newLink=null;
 
@@ -181,10 +188,14 @@ function render(){
     return;
   }
   who.innerHTML='<b>'+esc(S.me.name)+'</b><br>'+esc(S.me.role)+(S.me.role==='Limited'?' · '+esc(S.me.themes.join(', ')):'');
-  var allowed=VIEWS.filter(function(v){return can(v[2]);});
-  if(!allowed.some(function(v){return v[0]===view;}))view='now';
-  nav.innerHTML=allowed.map(function(v){return '<button data-act="view" data-v="'+v[0]+'" class="'+(v[0]===view?'on':'')+'">'+v[1]+'</button>';}).join('');
-  m.innerHTML=overrideBanner()+({now:vNow,devices:vDevices,override:vOverride,schedule:vSchedule,themes:vThemes,slides:vSlides,activity:vActivity,launchers:vLaunchers,greenroom:vGreenRoom,people:vPeople,church:vChurch,account:vAccount}[view])();
+  var allowed=VIEWS.filter(function(v){return can(v[2]);}),sets=SETTINGS.filter(function(v){return can(v[2]);});
+  var inSettings=sets.some(function(v){return v[0]===view;});
+  if(!inSettings&&!allowed.some(function(v){return v[0]===view;}))view='now';
+  if(inSettings)settingsLast=view;
+  var setTo=sets.some(function(v){return v[0]===settingsLast;})?settingsLast:sets[0][0];
+  nav.innerHTML=allowed.map(function(v){return '<button data-act="view" data-v="'+v[0]+'" class="'+(v[0]===view?'on':'')+'">'+v[1]+'</button>';}).join('')+
+    '<button data-act="view" data-v="'+setTo+'" class="navset'+(inSettings?' on':'')+'">Settings</button>';
+  m.innerHTML=overrideBanner()+(inSettings?'<div class="subnav" role="tablist">'+sets.map(function(v){return '<button role="tab" aria-selected="'+(v[0]===view)+'" data-act="view" data-v="'+v[0]+'" class="'+(v[0]===view?'on':'')+'">'+v[1]+'</button>';}).join('')+'</div>':'')+({now:vNow,devices:vDevices,override:vOverride,schedule:vSchedule,themes:vThemes,slides:vSlides,activity:vActivity,launchers:vLaunchers,greenroom:vGreenRoom,people:vPeople,church:vChurch,account:vAccount}[view])();
   fitScreens(m);
 }
 function overrideBanner(){
@@ -629,7 +640,7 @@ function uploadFiles(files){
 
 /* ---------- Activity ---------- */
 function vActivity(){
-  return '<section class="panel"><h2>Activity</h2><p class="muted small">Every change made through this panel, newest first.</p><div class="tbl"><table><thead><tr><th>When</th><th>Who</th><th>What</th><th>Details</th></tr></thead><tbody>'+
+  return '<section class="panel"><h2>Recent activity</h2><p class="muted small">Every change made through this panel, newest first.</p><div class="tbl"><table><thead><tr><th>When</th><th>Who</th><th>What</th><th>Details</th></tr></thead><tbody>'+
     S.activity.map(function(a){return '<tr><td class="num">'+esc(a.Time)+'</td><td>'+esc(a.User)+'</td><td>'+esc(a.Action)+'</td><td>'+esc(a.Details)+'</td></tr>';}).join('')+'</tbody></table></div></section>';
 }
 

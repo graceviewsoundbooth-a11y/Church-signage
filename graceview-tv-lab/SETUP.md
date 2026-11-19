@@ -31,7 +31,7 @@ The lab is the dashboard for **Church Signage**: a web control panel that replac
 
 Open the Web app URL while signed in to the Google account that deployed it. A setup page asks for the church name, your name and a **backup password**, and makes you the **Owner**. With access set to "Anyone", Google may not identify you, so sign in with your email and that password.
 
-On **People**, choose **Invite someone**, pick a role and send the one-time link (it expires in 7 days). They pick their own password.
+On **Settings → People**, choose **Invite someone**, pick a role and send the one-time link (it expires in 7 days). They pick their own password.
 
 | Role | Can do |
 |---|---|
@@ -86,7 +86,7 @@ On **Green Room**: the **Planning Center login** (personal access token: Applica
 
 ## Church
 
-On **Church** (Owner and Admin), the church-wide settings, stored on the Settings tab:
+On **Settings → Church** (Owner and Admin), the church-wide settings, stored on the Sheet's Settings tab. **Settings** also holds **People**, **Recent activity** and **Your account** (password); each person sees only the tabs their role allows.
 
 - **Church name** and **website** (e.g. `graceview.org`).
 - **Logo:** upload a PNG or JPG (saved as "Church logo" in the slides folder, shared by link; replacing it trashes the old one). It's on every emergency message, and any theme with no logo of its own uses it.
