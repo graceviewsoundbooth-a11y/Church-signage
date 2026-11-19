@@ -120,6 +120,7 @@ fun GraceviewApp(vm: SignageViewModel) {
                             onAnnouncements = { vm.announcementsOpen.value = true },
                             onDashboard = { vm.dashboardOpen.value = true },
                             layout = launcherLayout,
+                            events = events,
                         )
                     else -> when (mode) {
                         Mode.Fullscreen -> FullscreenScreen(theme, slides, hint)

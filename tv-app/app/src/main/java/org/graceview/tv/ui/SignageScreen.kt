@@ -264,7 +264,7 @@ private fun Sidebar(theme: Theme, events: List<CalEvent>?, bg: Color) {
 
 /** A column that places its children top to bottom and leaves out any child that wouldn't fit whole. */
 @Composable
-private fun FitColumn(modifier: Modifier, spacing: Dp, content: @Composable () -> Unit) {
+internal fun FitColumn(modifier: Modifier, spacing: Dp, content: @Composable () -> Unit) {
     Layout(content, modifier) { measurables, c ->
         val gap = spacing.roundToPx()
         val child = Constraints(maxWidth = c.maxWidth)
@@ -289,7 +289,7 @@ private fun FitColumn(modifier: Modifier, spacing: Dp, content: @Composable () -
 }
 
 @Composable
-private fun QrImage(text: String, size: Int) {
+internal fun QrImage(text: String, size: Int) {
     val bmp = remember(text) { runCatching { Qr.bitmap(text) }.getOrNull() } ?: return
     Box(Modifier.size(u(size + 16)).background(Color.White).padding(u(8))) {
         Image(bmp, contentDescription = null, modifier = Modifier.fillMaxSize(), filterQuality = FilterQuality.None)

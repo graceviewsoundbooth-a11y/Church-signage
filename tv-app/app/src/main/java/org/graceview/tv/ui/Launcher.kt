@@ -47,6 +47,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.core.graphics.drawable.toBitmap
+import androidx.compose.ui.draw.clip
+import org.graceview.tv.Config
+import org.graceview.tv.data.CalEvent
+import org.graceview.tv.data.Qr
 import org.graceview.tv.data.Device
 import org.graceview.tv.data.Slide
 import org.graceview.tv.data.Theme
@@ -138,6 +142,7 @@ fun LauncherScreen(
     onAnnouncements: () -> Unit,
     onDashboard: () -> Unit = {},
     layout: org.graceview.tv.data.LabLauncher? = null,
+    events: List<CalEvent>? = null,
 ) {
     val ctx = LocalContext.current
     val now by rememberNow()
@@ -170,7 +175,15 @@ fun LauncherScreen(
     val first = remember { FocusRequester() }
 
     Box(Modifier.fillMaxSize().background(main)) {
-        SlideArea(slides, main, theme.displayName, hint, showDots = false)
+        // The announcements in a 16:9 box (not full screen behind the tiles, where they were hard to see),
+        // with guest Wi-Fi and This Week beside them. Same layout as the dashboard's preview.
+        Box(
+            Modifier.padding(start = u(64), top = u(160)).size(u(960), u(540))
+                .clip(RoundedCornerShape(u(18))).background(main),
+        ) {
+            SlideArea(slides, main, theme.displayName, hint, showDots = false)
+        }
+        LauncherInfo(theme, events, Modifier.padding(start = u(1088), top = u(160)).size(u(768), u(540)))
 
         Row(
             Modifier.fillMaxWidth().height(u(120)).background(accent).padding(horizontal = u(72)),
@@ -204,6 +217,52 @@ fun LauncherScreen(
         }
     }
     LaunchedEffect(tiles) { runCatching { first.requestFocus() } }
+}
+
+/** Beside the announcements: guest Wi-Fi (QR, network, password), then This Week. No Wi-Fi: This Week has the room. */
+@Composable
+private fun LauncherInfo(theme: Theme, events: List<CalEvent>?, modifier: Modifier) {
+    val text = Color.White // the TV app draws all theme text in white
+    val hasWifi = theme.wifiName.isNotBlank()
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(u(28))) {
+        if (hasWifi) {
+            Row(
+                Modifier.fillMaxWidth().background(Color(0x47000000), RoundedCornerShape(u(18))).padding(horizontal = u(28), vertical = u(22)),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(u(28)),
+            ) {
+                QrImage(Qr.wifiPayload(theme.wifiName, theme.wifiPassword), 150)
+                Column(verticalArrangement = Arrangement.spacedBy(u(2))) {
+                    T("Free Wi-Fi", 34, weight = FontWeight.Bold, family = Montserrat, color = text)
+                    T("NETWORK", 20, weight = FontWeight.SemiBold, letterSpacingEm = 0.1f, color = text.copy(alpha = 0.75f), modifier = Modifier.padding(top = u(8)))
+                    T(theme.wifiName, 30, color = text, maxLines = 1)
+                    if (theme.wifiPassword.isNotBlank()) {
+                        T("PASSWORD", 20, weight = FontWeight.SemiBold, letterSpacingEm = 0.1f, color = text.copy(alpha = 0.75f), modifier = Modifier.padding(top = u(8)))
+                        T(theme.wifiPassword, 30, color = text, maxLines = 1)
+                    }
+                }
+            }
+        }
+        if (events != null) {
+            Column(Modifier.weight(1f).padding(horizontal = u(8)), verticalArrangement = Arrangement.spacedBy(u(20))) {
+                Column {
+                    T("This Week", 34, weight = FontWeight.Bold, family = Montserrat, color = text)
+                    Spacer(Modifier.height(u(14)))
+                    Box(Modifier.fillMaxWidth().height(u(2)).background(text.copy(alpha = 0.6f)))
+                }
+                // Only events that fit whole: one cut off at the bottom looks broken.
+                FitColumn(Modifier.weight(1f).fillMaxWidth(), u(20)) {
+                    if (events.isEmpty()) T(Config.NO_EVENTS_TEXT, 30, color = text, lineHeight = 1.2f)
+                    else events.take(5).forEach { ev ->
+                        Column(verticalArrangement = Arrangement.spacedBy(u(4))) {
+                            T(ev.label().uppercase(Locale.US), 22, weight = FontWeight.SemiBold, letterSpacingEm = 0.1f, color = text, maxLines = 1)
+                            T(ev.title, 32, color = text, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

@@ -77,16 +77,34 @@
 .scr-dash .vid{flex:1;background:#05070a;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#5d6873}
 .scr-dash .now{background:#2a313b;border-left:10px solid #F4D35E;padding:8px 18px;border-radius:6px}
 .scr-dash .done{color:#5d6873}
-.scr-launch{position:absolute;inset:0;background:linear-gradient(160deg,rgba(0,0,0,0) 0%,rgba(0,0,0,.45) 100%),var(--m);display:flex;flex-direction:column;padding:70px 90px}
-.scr-launch .hd{display:flex;justify-content:space-between;align-items:center}
-.scr-launch .brand{display:flex;align-items:center;gap:30px;font-family:Montserrat,'Segoe UI',Arial,sans-serif;font-weight:700;font-size:52px}
-.scr-launch .ann{position:relative;width:1100px;height:520px;margin-top:50px;border-radius:18px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35)}
-.scr-launch .ann .scr-tslide{padding:0 80px}
-.scr-launch .ann .scr-tslide h1{font-size:76px}
-.scr-launch .ann .scr-tslide p{font-size:38px}
-.scr-launch .apps{display:flex;gap:26px;margin-top:auto}
-.scr-launch .app{width:220px;height:150px;border-radius:16px;background:rgba(255,255,255,.14);display:flex;align-items:flex-end;padding:18px;font-size:27px;line-height:1.1;font-weight:600;overflow:hidden}
-.scr-launch .app.hi{background:#fff;color:#111;outline:6px solid #F4D35E;outline-offset:6px}
+/* Home screen: same layout as the TV app's LauncherScreen. Top bar, slides in a 16:9 box beside guest Wi-Fi
+   and This Week, app tiles along the bottom. */
+.scr-launch{position:absolute;inset:0;background:var(--m);color:#fff}
+.scr-launch .hd{position:absolute;left:0;top:0;width:1920px;height:120px;background:var(--a);color:var(--at);display:flex;justify-content:space-between;align-items:center;padding:0 72px}
+.scr-launch .hd .l,.scr-launch .hd .r{display:flex;align-items:center;gap:24px;font-size:40px;font-weight:300}
+.scr-launch .hd .r{gap:40px}
+.scr-launch .hd .dev{font-size:34px;font-weight:600;padding-left:24px;border-left:2px solid currentColor}
+.scr-launch .hd .scr-logo-img{max-width:210px;max-height:90px}
+.scr-launch .hd .scr-logo{width:84px;height:84px;font-size:40px;border-width:5px}
+.scr-launch .ann{position:absolute;left:64px;top:160px;width:960px;height:540px;border-radius:18px;overflow:hidden;background:var(--m);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.scr-launch .ann .scr-tslide{padding:0 70px}
+.scr-launch .ann .scr-tslide h1{font-size:68px}
+.scr-launch .ann .scr-tslide p{font-size:34px}
+.scr-launch .info{position:absolute;left:1088px;top:160px;width:768px;height:540px;display:flex;flex-direction:column;gap:28px;color:var(--mt)}
+.scr-launch .card{background:rgba(0,0,0,.28);border-radius:18px;padding:28px 32px;display:flex;gap:30px;align-items:center}
+.scr-launch .card .scr-qr i{width:196px;height:196px}
+.scr-launch .card h3{margin:0 0 10px;font-family:Montserrat,'Segoe UI',Arial,sans-serif;font-size:40px;font-weight:700}
+.scr-launch .card .k{font-size:22px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;opacity:.75;margin-top:12px}
+.scr-launch .card .v{font-size:36px;overflow-wrap:anywhere;line-height:1.15}
+.scr-launch .wk{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:20px;padding:0 8px}
+.scr-launch .wk h2{margin:0;padding-bottom:14px;border-bottom:2px solid color-mix(in srgb,currentColor 60%,transparent);font-family:Montserrat,'Segoe UI',Arial,sans-serif;font-weight:700;font-size:34px}
+.scr-launch .wk .scr-ev span{-webkit-line-clamp:1}
+.scr-launch .apps{position:absolute;left:0;bottom:0;width:1920px;height:340px;background:rgba(8,12,20,.88);padding:30px 64px 40px;display:flex;flex-direction:column;gap:12px}
+.scr-launch .apps .t{font-size:28px;font-weight:600;letter-spacing:.06em;padding-left:8px}
+.scr-launch .apps .row{display:flex;gap:8px}
+.scr-launch .app{width:212px;height:212px;border:6px solid transparent;border-radius:28px;padding:8px;flex:none}
+.scr-launch .app div{width:100%;height:100%;border-radius:20px;background:#2C3442;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;font-size:26px;line-height:1.1;font-weight:600;overflow:hidden}
+.scr-launch .app.hi{border-color:#fff}
 .scr-off{position:absolute;inset:0;background:#000;display:flex;align-items:center;justify-content:center;color:#2b2b2b;font-size:64px;font-family:Montserrat,'Segoe UI',Arial,sans-serif}
 </style>
 <script>
@@ -143,7 +161,7 @@ function renderScreen(s,clk,wx,o){
     case 'Live': b=scrLive(s);break;
     case 'Message': b=scrMessage(s,clk);break;
     case 'Dashboard': b=scrDash(s,clk);break;
-    case 'Launcher': case 'Live Option': b=scrLauncher(s,clk,o);break;
+    case 'Launcher': case 'Live Option': b=scrLauncher(s,clk,o,wx);break;
     default: b='<div class="scr-off">Off</div>';
   }
   return '<div class="scr" style="'+vars+'">'+b+'</div>';
@@ -209,15 +227,25 @@ function scrDash(s,clk){
     '<div class="pn"><h3>Order of service</h3><div class="done">Welcome</div><div class="now">Opening song</div>'+
     '<div>Announcements</div><div>Sermon</div><div>Closing song</div><h3>Band</h3><div>Keys · Acoustic · Bass · Drums</div></div></div></div>';
 }
-function scrLauncher(s,clk,o){
-  var c=clockParts(clk.mins),p=pickSlide(s,o),live=s.mode==='Live Option';
+function scrLauncher(s,clk,o,wx){
+  var th=s.theme,c=clockParts(clk.mins),d=ymdParts(clk.ymd),p=pickSlide(s,o),live=s.mode==='Live Option',q=o.qr!==false;
   // A Launchers-page layout when the TV has one, otherwise the app's built-in row.
-  var apps=s.launcherTiles&&s.launcherTiles.length?s.launcherTiles.slice(0,7)
-    :(live?['Watch Live']:[]).concat(['Screen Mirror','HDMI','YouTube','Browser','Apps','Settings']);
-  return '<div class="scr-launch"><div class="hd"><div class="brand">'+logoHTML(s.theme)+esc(s.theme.display)+'</div>'+
-    '<div class="scr-clock">'+c.t+'<small>'+c.ap+'</small></div></div>'+
-    '<div class="ann">'+slideHTML(p.sl,s.theme)+'</div>'+
-    '<div class="apps">'+apps.map(function(a,i){return '<div class="app'+(i===0?' hi':'')+'">'+esc(a)+'</div>';}).join('')+'</div></div>';
+  var apps=s.launcherTiles&&s.launcherTiles.length?s.launcherTiles.slice(0,8)
+    :(live?['Watch Live']:[]).concat(['Screen Mirror','HDMI Input','YouTube','Web Browser','Get Apps','All Apps','Settings']);
+  // Beside the slides: guest Wi-Fi (the theme's, or the church's), then This Week. No Wi-Fi: This Week has the room.
+  var wifi=th.wifiName?'<div class="card"><div class="scr-qr">'+(q?qrBox('WIFI:T:WPA;S:'+th.wifiName+';P:'+(th.wifiPass||'')+';;'):'<i class="ph"></i>')+'</div>'+
+    '<div><h3>Free Wi-Fi</h3><div class="k">Network</div><div class="v">'+esc(th.wifiName)+'</div>'+
+    (th.wifiPass?'<div class="k">Password</div><div class="v">'+esc(th.wifiPass)+'</div>':'')+'</div></div>':'';
+  var evs=s.events||[];
+  var wk='<div class="wk"><h2>This Week</h2>'+(evs.length?evs.slice(0,wifi?2:5).map(function(e){
+      return '<div class="scr-ev"><b>'+esc(e.today?'Today':e.dow)+' · '+esc(e.allDay?'All day':fmtRange(e.start,e.end))+'</b><span>'+esc(e.title)+'</span></div>';
+    }).join(''):'<div class="scr-ev"><span>'+esc((s.church&&s.church.noEvents)||'Nothing on the calendar this week.')+'</span></div>')+'</div>';
+  return '<div class="scr-launch">'+
+    '<div class="hd"><div class="l">'+logoHTML(th)+'<span class="dev">'+esc(s.device.name)+'</span></div>'+
+      '<div class="r">'+(wx?'<span>'+wx.temp+'°</span>':'')+'<span>'+d.dow+', '+d.month.slice(0,3)+' '+d.day+'</span><span style="font-weight:400">'+c.t+' '+c.ap+'</span></div></div>'+
+    '<div class="ann">'+slideHTML(p.sl,th)+'</div>'+
+    '<div class="info">'+wifi+wk+'</div>'+
+    '<div class="apps"><div class="t">Apps</div><div class="row">'+apps.map(function(a,i){return '<div class="app'+(i===0?' hi':'')+'"><div'+(a.indexOf(' ')<0&&a.length>11?' style="font-size:22px"':'')+'>'+esc(a)+'</div></div>';}).join('')+'</div></div></div>';
 }
 
 /* Scales every .tvbox's screen to the box width. */
