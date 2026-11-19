@@ -1226,7 +1226,9 @@ function church_() {
  * The key can only read files already shared by link (slides are), and the Drive API doesn't bill.
  * With no key at all, previews show videos as stills. TVs never need it.
  */
-const BUILTIN_VIDEO_KEY = '';
+// Church Signage's own key (Google Cloud project "Church Signage"), limited to the Google Drive API. Not a secret:
+// it's in every preview page, and it can only read files shared by link.
+const BUILTIN_VIDEO_KEY = 'AIzaSyCSoJrv_hu6B2seV0IkCvoH3_B6p4KeYb0';
 const VIDEO_KEY_RE = /^AIza[0-9A-Za-z_-]{35}$/;
 function videoKey_() {
   const own = String(settings_()['Google API Key'] || '').trim();
