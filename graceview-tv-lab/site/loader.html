@@ -25,13 +25,21 @@
   var EXEC = 'https://script.google.com/macros/s/AKfycbxyaLwdIBo2LVLXFnOlm0xiw_nCcXljc2EcQ84BenlQU0ODyWaA7AfnwTywzVuQVhhS6w/exec';
   var PAGE_KEY = 'cs-dash-page';
   var box = document.getElementById('cs-dash');
+  // Built with DOM calls, not an HTML string: website editors (Clover's) reformat HTML-looking text in a
+  // code block and can break a string across lines. Keep this script plain ASCII with no tags in strings.
+  function el(tag, text, css) { var e = document.createElement(tag); if (text) e.textContent = text; if (css) e.style.cssText = css; return e; }
   function failed(why) {
-    box.innerHTML = '<p><b>The signage dashboard didn’t load.</b></p><p style="color:#777">' + why + '</p>' +
-      '<p><a href="" onclick="location.reload();return false;">Try again</a> · <a href="' + EXEC + '">Open it on Google instead</a></p>';
+    box.textContent = '';
+    var p1 = el('p'); p1.appendChild(el('b', 'The signage dashboard did not load.'));
+    var p3 = el('p');
+    var again = el('a', 'Try again'); again.href = '#'; again.onclick = function () { location.reload(); return false; };
+    var google = el('a', 'Open it on Google instead'); google.href = EXEC;
+    p3.appendChild(again); p3.appendChild(document.createTextNode(' - ')); p3.appendChild(google);
+    box.appendChild(p1); box.appendChild(el('p', String(why), 'color:#777')); box.appendChild(p3);
   }
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function put(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* full or blocked: no copy kept */ } }
-  // Pass this page's own query (an invite link's ?invite=…) on to the dashboard.
+  // Pass this page's own query (an invite link's ?invite=...) on to the dashboard.
   var q = location.search.replace(/^\?/, '');
 
   // Ask for the signed-in person's dashboard now, while the page itself loads; the page picks up this answer.
