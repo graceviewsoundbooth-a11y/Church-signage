@@ -42,7 +42,7 @@ function doGet(e) {
   const t = HtmlService.createTemplateFromFile(isTv ? 'Tv' : 'Panel');
   t.params = JSON.stringify(p).replace(/</g, '\\u003c');
   return t.evaluate()
-    .setTitle(p.tv ? 'Preview: ' + p.tv : isTv ? 'Graceview TV screen' : 'Graceview TV Lab')
+    .setTitle(p.tv ? 'Preview: ' + p.tv : (settings_()['Church Name'] || 'Church') + (isTv ? ' screen' : ' Signage'))
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -1309,7 +1309,7 @@ function getState(iso, token) {
   const d = data_();
   const me = me_(d, token);
   const st = settings_();
-  if (me.role === 'None') return { me: me, state: me.state, church: st['Church Name'] || '' };
+  if (me.role === 'None') return { me: me, state: me.state, church: st['Church Name'] || '', logo: logoImg_(st['Church Logo']) }; // the sign-in page shows the church's name and logo
   const t = at_(iso);
   const devices = d.devices.filter(function (v) { return deviceOk_(me, v); }).map(function (v) {
     const now = resolve_(v, t, d);
