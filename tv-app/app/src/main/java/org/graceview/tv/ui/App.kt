@@ -161,7 +161,7 @@ private fun StatusScreen(title: String, detail: String) {
     }
 }
 
-/** Church Signage: "Pair this screen" with the code to type into the dashboard (Now > Pair a TV). */
+/** Church Signage: "Pair this screen" with the code to type into the dashboard (Screens > + Add a screen). */
 @Composable
 private fun PairingScreen(p: PairStart?, church: String, error: String?) {
     Column(
@@ -186,9 +186,10 @@ private fun PairingScreen(p: PairStart?, church: String, error: String?) {
                 T(p.code.take(3) + "-" + p.code.drop(3), 200, weight = FontWeight.Bold, family = Montserrat)
             }
             Spacer(Modifier.height(u(40)))
-            T("1. On a phone or computer, open the dashboard and sign in", 36, color = Color(0xFFC9D1DA))
-            T("2. Go to Now and choose Pair a TV", 36, color = Color(0xFFC9D1DA))
-            T("3. Type this code and pick which TV this is", 36, color = Color(0xFFC9D1DA))
+            val where = p.dashboard.ifBlank { "the signage dashboard" }
+            T("1. On a phone or computer, open $where and sign in", 36, color = Color(0xFFC9D1DA))
+            T("2. Go to Screens and choose + Add a screen", 36, color = Color(0xFFC9D1DA))
+            T("3. Type this code, then pick which screen this is", 36, color = Color(0xFFC9D1DA))
             Spacer(Modifier.height(u(32)))
             T("A new code appears on its own every 15 minutes.", 28, color = Color(0xFF6D7783))
         }

@@ -19,7 +19,15 @@ import java.io.IOException
  */
 
 @Serializable
-data class PairStart(val code: String = "", val secret: String = "", val exp: Long = 0, val church: String = "", val error: String? = null)
+data class PairStart(
+    val code: String = "",
+    val secret: String = "",
+    val exp: Long = 0,
+    val church: String = "",
+    /** Where people open the dashboard, as they'd type it ("graceview.org/signage"); blank if the church hasn't set one. */
+    val dashboard: String = "",
+    val error: String? = null,
+)
 
 @Serializable
 data class PairCheck(

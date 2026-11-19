@@ -1978,8 +1978,12 @@ function startPairing(info) {
     const secret = newToken_();
     const exp = Date.now() + PAIR_MINUTES * 60000;
     props_().setProperty('pair:' + code, JSON.stringify({ secret: sha_(secret), exp: exp, ua: String((info && info.ua) || '').slice(0, 160) }));
-    return { code: code, secret: secret, exp: exp, church: settings_()['Church Name'] || '' };
+    return { code: code, secret: secret, exp: exp, church: settings_()['Church Name'] || '', dashboard: dashboardShort_() };
   });
+}
+/** The Church page's dashboard address as people type it ("graceview.org/signage"), for the pairing screen. '' if none. */
+function dashboardShort_() {
+  return String(settings_()['Dashboard Address'] || '').trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/+$/, '');
 }
 
 function checkPairing(code, secret) {

@@ -157,7 +157,7 @@ function drawPairing(){
   var left=Math.max(0,Math.round((pairing.exp-Date.now())/60000));
   stage('<div class="pair">'+(pairing.church?'<div class="church">'+esc2(pairing.church)+'</div>':'')+
     '<h1>Pair this screen</h1><div class="code">'+esc2(codeText(pairing.code))+'</div>'+
-    '<ol><li>On a phone or computer, open the dashboard and sign in</li><li>Go to <b>Now</b> and choose <b>Pair a TV</b></li><li>Type this code and pick which TV this is</li></ol>'+
+    '<ol><li>On a phone or computer, open '+(pairing.dashboard?'<b>'+esc2(pairing.dashboard)+'</b>':'the signage dashboard')+' and sign in</li><li>Go to <b>Screens</b> and choose <b>+ Add a screen</b></li><li>Type this code, then pick which screen this is</li></ol>'+
     '<div class="small">This code changes in about '+left+' minute'+(left===1?'':'s')+'. A new one appears on its own.</div></div>');
 }
 function startPairing(){

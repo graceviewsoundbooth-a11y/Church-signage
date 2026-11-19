@@ -125,6 +125,19 @@ if (-not $SkipInstall) {
 $installed = (Sh "pm list packages $Pkg") -match $Pkg
 if (-not $installed) { throw 'The app is not installed on the stick.' }
 
+# --- Only one version runs ----------------------------------------------------
+# Both versions keep their own schedule alarms, and at each change an app wakes the TV and comes to the
+# front. So the version this stick is NOT using is paused (disabled: still installed, settings kept, no
+# alarms, can't open), and this one is turned back on if it was paused. Switching back undoes it.
+# Note: installing an update of the paused version (1.0's church-PC updater) turns it back on.
+$out = Sh "pm enable --user 0 $Pkg"
+Note 'This version on' ($out -match 'enabled') ($out.Trim())
+if ((Sh "pm list packages $Other") -match $Other) {
+    $null = Sh "am force-stop $Other"
+    $out = Sh "pm disable-user --user 0 $Other"
+    Note 'Other version paused' ($out -match 'disabled') ("$Other " + $out.Trim())
+}
+
 # --- Permissions ------------------------------------------------------------
 $out = Sh "appops set $Pkg SYSTEM_ALERT_WINDOW allow"
 $check = Sh "appops get $Pkg SYSTEM_ALERT_WINDOW"
