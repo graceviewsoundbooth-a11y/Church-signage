@@ -37,6 +37,7 @@ function doGet(e) {
   // Asks anyone opening the app to approve permissions they haven't approved yet (Drive, for example).
   if (ScriptApp.requireAllScopes) ScriptApp.requireAllScopes(ScriptApp.AuthMode.FULL);
   const p = (e && e.parameter) || {};
+  if (p.app === 'panel') return panelForSite_(p);
   // "?screen" = a TV (pairs itself, then shows its device). "?tv=ID" = a preview for signed-in people.
   const isTv = !!p.tv || Object.prototype.hasOwnProperty.call(p, 'screen');
   const t = HtmlService.createTemplateFromFile(isTv ? 'Tv' : 'Panel');
@@ -985,6 +986,7 @@ function church_() {
     // What screens show: the church's own wording, or wording built from the website.
     messageLine: msgSet || (site ? 'Watch ' + site + ' and your email for updates.' : ''),
     noEvents: evSet || (site ? 'See all events at ' + site : 'Nothing on the calendar this week.'),
+    dashboardAddress: String(st['Dashboard Address'] || '').trim(),
     logoLink: String(st['Church Logo'] || '').trim(),
     logo: logoImg_(st['Church Logo']),
     wifiName: String(st['Wi-Fi Name'] || '').trim(),
@@ -1036,6 +1038,9 @@ function saveChurchSettings(o, token) {
     setSetting_('Temperature Unit', o.unit === 'C' ? 'C' : 'F');
     setSetting_('Message Line', String(o.messageLine || '').trim());
     setSetting_('No Events Text', String(o.noEvents || '').trim());
+    const addr = String(o.dashboardAddress || '').trim();
+    if (addr && !/^https:\/\/[^\s"<>]+$/i.test(addr)) throw new Error('The dashboard address has to start with https://');
+    setSetting_('Dashboard Address', addr);
     setSetting_('Wi-Fi Name', String(o.wifiName || '').trim());
     setSetting_('Wi-Fi Password', String(o.wifiName || '').trim() ? String(o.wifiPass || '') : '');
     tzCache_ = null;
@@ -1208,7 +1213,8 @@ function changePassword(current, next, token) {
 function makeInvite_(email) {
   const token = newToken_();
   props_().setProperty('inv:' + sha_(token), JSON.stringify({ email: email, exp: Date.now() + INVITE_DAYS * 86400000 }));
-  return ScriptApp.getService().getUrl() + '?invite=' + token;
+  const base = dashboardLink_();
+  return base + (base.indexOf('?') >= 0 ? '&' : '?') + 'invite=' + token;
 }
 
 /** Adds a person (returns their invite link) or changes an existing person's role and access. */
@@ -1386,11 +1392,60 @@ function doPost(e) {
     if (req.action === 'pairStart') out = startPairing({ ua: req.ua });
     else if (req.action === 'pairCheck') out = checkPairing(req.code, req.secret);
     else if (req.action === 'state') out = tvState_(req.key, req.apps, req.greenRoom, req.info);
+    else if (req.action === 'panel') out = panelCall_(req.fn, req.args);
     else out = { error: 'Unknown action.' };
   } catch (err) {
     out = { error: String((err && err.message) || err) };
   }
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/* ---------- The dashboard at the church's own address ----------
+ * A browser signed into several Google accounts can't open an Apps Script link ("Sorry, unable to open
+ * the file": Google adds /u/N/ to it). So the church's website (graceview.org/signage) holds a small
+ * loader instead (site/loader.html). It fetches the dashboard page from "?app=panel" and sends the
+ * dashboard's calls here as {action:"panel", fn, args}, both without the browser's Google accounts.
+ * Only the functions listed below can be called, and each still checks the sign-in token itself.
+ */
+function panelApi_() {
+  return {
+    getState: getState, signIn: signIn, signOut: signOut, inviteInfo: inviteInfo, acceptInvite: acceptInvite,
+    changePassword: changePassword, findPlace: findPlace, checkCalendars: checkCalendars, themeUsage: themeUsage,
+    uploadSlide: uploadSlide, addTheme: addTheme, approvePairing: approvePairing, clearPlanningCenter: clearPlanningCenter,
+    createThemeFolder: createThemeFolder, deleteLauncher: deleteLauncher, deleteRow: deleteRow, deleteTheme: deleteTheme,
+    duplicateTheme: duplicateTheme, endOverride: endOverride, moveSlideFile: moveSlideFile, moveWeekly: moveWeekly,
+    reinviteUser: reinviteUser, removeChurchLogo: removeChurchLogo, removeDevice: removeDevice, removeUser: removeUser,
+    saveChurchSettings: saveChurchSettings, saveDevice: saveDevice, saveGreenRoom: saveGreenRoom, saveLauncher: saveLauncher,
+    savePlanningCenter: savePlanningCenter, saveSpecial: saveSpecial, saveTheme: saveTheme, saveUser: saveUser,
+    saveWeekly: saveWeekly, setFallbackTheme: setFallbackTheme, setSlideFileDates: setSlideFileDates,
+    setUserActive: setUserActive, shareThemeFolder: shareThemeFolder, startOverride: startOverride,
+    trashSlideFile: trashSlideFile, unpairDevice: unpairDevice, uploadChurchLogo: uploadChurchLogo,
+  };
+}
+function panelCall_(fn, args) {
+  const api = panelApi_();
+  if (typeof fn !== 'string' || !Object.prototype.hasOwnProperty.call(api, fn)) return { ok: false, error: 'Unknown call.' };
+  try {
+    return { ok: true, result: api[fn].apply(null, Array.isArray(args) ? args : []) };
+  } catch (err) {
+    return { ok: false, error: String((err && err.message) || err) };
+  }
+}
+/** The dashboard page for the loader, as JSON {html, title}. Same page as the Google link, plus where to send calls. */
+function panelForSite_(p) {
+  const q = {};
+  Object.keys(p).forEach(function (k) { if (k !== 'app') q[k] = String(p[k]); });
+  q.exec = ScriptApp.getService().getUrl();
+  q.site = true;
+  const t = HtmlService.createTemplateFromFile('Panel');
+  t.params = JSON.stringify(q).replace(/</g, '\\u003c');
+  const out = { html: t.evaluate().getContent(), title: (settings_()['Church Name'] || 'Church') + ' Signage' };
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+/** Where people open the dashboard: the church's own address (Church page) if set, else the Google link. */
+function dashboardLink_() {
+  const v = String(settings_()['Dashboard Address'] || '').trim();
+  return /^https:\/\/[^\s"<>]+$/i.test(v) ? v : ScriptApp.getService().getUrl();
 }
 
 function tvState_(deviceKey, apps, greenRoomStatus, info) {

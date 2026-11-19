@@ -1,0 +1,40 @@
+<!--
+  Church Signage: the dashboard at the church's own address (for example graceview.org/signage).
+
+  Paste this whole block into a custom code / embed block on that page of the church website
+  (Clover: add a Custom Code section). It works on any web host that allows a script, or as a page of its own.
+
+  Why: a browser signed into more than one Google account can't open the Apps Script link directly
+  (Google Drive's "Sorry, unable to open the file at this time"). This loads the dashboard from the
+  web app without the browser's Google accounts, so it opens for everyone, with the church's address.
+
+  If the dashboard is ever redeployed under a NEW deployment (a new /exec link), change EXEC below.
+  "Manage deployments > New version" keeps the same link, so nothing here changes.
+-->
+<div id="cs-dash" style="font:16px/1.5 system-ui,-apple-system,'Segoe UI',Arial,sans-serif;max-width:520px;margin:48px auto;padding:24px;text-align:center;color:#444">
+  Loading the signage dashboard…
+</div>
+<script>
+(function () {
+  var EXEC = 'https://script.google.com/macros/s/AKfycbz1e2aevuTTBZJMOdzksVbK2BqcyRBR2ffS8R-IDmJ03vUMJ50jZRt7X02YV9AmoriWtQ/exec';
+  var box = document.getElementById('cs-dash');
+  function failed(why) {
+    box.innerHTML = '<p><b>The signage dashboard didn’t load.</b></p><p style="color:#777">' + why + '</p>' +
+      '<p><a href="" onclick="location.reload();return false;">Try again</a> · <a href="' + EXEC + '">Open it on Google instead</a></p>';
+  }
+  // Pass this page's own query (an invite link's ?invite=…) on to the dashboard.
+  var q = location.search.replace(/^\?/, '');
+  // credentials: 'omit' is the point: no Google accounts are sent, so Google doesn't add /u/N/.
+  fetch(EXEC + '?app=panel' + (q ? '&' + q : ''), { credentials: 'omit' })
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function (j) {
+      if (!j || !j.html) throw new Error(j && j.error ? j.error : 'Empty reply');
+      // The dashboard is a whole page: it replaces this one (the website's header and footer go away).
+      document.open();
+      document.write(j.html);
+      document.close();
+      if (j.title) document.title = j.title;
+    })
+    .catch(function (e) { failed('Check the internet connection. (' + (e && e.message ? e.message : e) + ')'); });
+})();
+</script>

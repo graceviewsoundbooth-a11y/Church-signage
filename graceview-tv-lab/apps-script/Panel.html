@@ -200,6 +200,31 @@ function groupTabs(g){return g.tabs.filter(function(t){return can(t[2]);});}
 function groupOf(v){for(var i=0;i<GROUPS.length;i++)if(GROUPS[i].tabs.some(function(t){return t[0]===v;}))return GROUPS[i];return null;}
 function allowedView(v){if(v==='override')return can('override');var g=groupOf(v);return !!g&&groupTabs(g).some(function(t){return t[0]===v;});}
 var P=JSON.parse(document.getElementById('params').textContent||'{}');
+/*
+ * Opened at the church's own address (the loader on its website, P.site): there's no google.script.run,
+ * so the same calls go to the web app's API, without the browser's Google accounts. Same names, same
+ * success and failure handlers, so the rest of the page doesn't know the difference.
+ */
+if(P.site&&P.exec&&(typeof google==='undefined'||!google.script||!google.script.run)){
+  (function(){
+    function runner(ok,fail){
+      return new Proxy({},{get:function(t,k){
+        if(k==='withSuccessHandler')return function(f){return runner(f,fail);};
+        if(k==='withFailureHandler')return function(f){return runner(ok,f);};
+        if(k==='withUserObject')return function(){return runner(ok,fail);};
+        return function(){
+          var args=Array.prototype.slice.call(arguments);
+          fetch(P.exec,{method:'POST',credentials:'omit',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'panel',fn:String(k),args:args})})
+            .then(function(r){return r.json();})
+            .then(function(j){if(j&&j.ok){if(ok)ok(j.result);}else if(fail)fail({message:(j&&j.error)||'Something went wrong. Try again.'});})
+            .catch(function(){if(fail)fail({message:'Couldn\'t reach the dashboard. Check the connection and try again.'});});
+        };
+      }});
+    }
+    window.google={script:{}};
+    Object.defineProperty(window.google.script,'run',{get:function(){return runner(null,null);}});
+  })();
+}
 var INVITE=P.invite||'', INV=null, userEdit=null, newLink=null;
 
 /* Sign-in token, kept in this browser only. */
@@ -1033,7 +1058,7 @@ var chForm=null, chPlaces=null;
 var COMMON_TZ=['America/New_York','America/Chicago','America/Denver','America/Phoenix','America/Los_Angeles','America/Anchorage','Pacific/Honolulu',
   'America/Puerto_Rico','America/Toronto','America/Vancouver','Europe/London','Australia/Sydney'];
 function chLoad(){var c=S.churchSettings||{};return {name:c.name||'',website:c.website||'',timeZone:c.timeZone||'America/Chicago',place:c.place||'',
-  lat:c.lat==null?'':c.lat,lon:c.lon==null?'':c.lon,unit:c.unit||'F',messageLine:c.messageLineSet||'',noEvents:c.noEventsSet||'',
+  lat:c.lat==null?'':c.lat,lon:c.lon==null?'':c.lon,unit:c.unit||'F',messageLine:c.messageLineSet||'',noEvents:c.noEventsSet||'',dashboardAddress:c.dashboardAddress||'',
   wifiName:c.wifiName||'',wifiPass:c.wifiPass||''};}
 function chSite(){return String(chForm.website||'').trim().replace(/^https?:\/\//i,'').replace(/\/+$/,'');}
 function chMsgDefault(){var s=chSite();return s?'Watch '+s+' and your email for updates.':'';}
@@ -1058,7 +1083,9 @@ function vChurch(){
   var where=f.lat!==''?'<span class="chip ok">'+esc(f.place||'Set')+'</span> <span class="muted small">'+esc(f.lat+', '+f.lon)+'</span>':'<span class="chip">Not set: screens leave the weather spot empty</span>';
   var h='<section class="panel"><h2>Church</h2><p class="muted small">Church-wide settings. TVs pick up changes within a minute.</p>'+
     '<div class="fgrid"><label class="f">Church name<input type="text" data-cf="name" value="'+esc(f.name)+'"></label>'+
-    '<label class="f">Website<input type="text" data-cf="website" value="'+esc(f.website)+'" placeholder="yourchurch.org" spellcheck="false"></label></div></section>';
+    '<label class="f">Website<input type="text" data-cf="website" value="'+esc(f.website)+'" placeholder="yourchurch.org" spellcheck="false"></label>'+
+    '<label class="f">Dashboard address<input type="text" data-cf="dashboardAddress" value="'+esc(f.dashboardAddress)+'" placeholder="https://yourchurch.org/signage" spellcheck="false"></label></div>'+
+    '<p class="muted small" style="margin:0">The page on your website that opens this dashboard (see the setup guide). Invite links use it. Blank uses Google’s link'+(P.site?'':', which fails in browsers signed into more than one Google account')+'.</p></section>';
 
   var lg=(S.churchSettings||{}).logo;
   h+='<section class="panel"><h3>Logo and guest Wi-Fi</h3>'+

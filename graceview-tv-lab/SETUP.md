@@ -108,6 +108,16 @@ On **Settings → Church** (Owner and Admin), the church-wide settings, stored o
 
 Paired TVs pick up changes on their next check-in. The weather refreshes right away when its location or unit changes.
 
+## The dashboard at the church's own address
+
+A browser signed into more than one Google account can't open the Apps Script link (Google Drive's "Sorry, unable to open the file"). So the church website hosts a small loader instead, at an address like **graceview.org/signage**:
+
+1. On the website, make a page at that address (not a redirect) and add a custom code block (Clover: a **Custom Code** section).
+2. Paste in the whole of [site/loader.html](site/loader.html). It fetches the dashboard from the web app without the browser's Google accounts and replaces the page with it.
+3. On **Settings → Church**, set **Dashboard address** to that page. Invite links then use it.
+
+On that page everyone signs in with their dashboard password, the Owner too (the backup password from setup). First-time setup still needs the Google link. The loader only calls the dashboard's own functions (listed in `panelApi_` in Code.gs), and each checks the sign-in. "New version" deployments keep the same link; a brand-new deployment means updating `EXEC` in the loader.
+
 ## Known limits
 
 - **"Sorry, unable to open the file at this time" (Google Drive page):** the browser is signed into more than one Google account, and the link picked up a `/u/1/`, `/u/4/`… part. Open the dashboard in a private or Incognito tab (or sign out of the extra accounts). Nobody needs a Google account to use it.
