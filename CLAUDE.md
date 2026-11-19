@@ -46,7 +46,7 @@ The shared copy is the private GitHub repo **graceviewsoundbooth-a11y/church-sig
 |---|---|---|---|
 | Coffee Spot | NVIDIA SHIELD (Android 11, API 30) | 192.168.0.125 | **2.0** since 2026-11-19 (paired; 1.0 paused; its 1.0 IP Address cleared) |
 | Lobby | onn 4K, Google TV (Android 14) | 192.168.0.142 | **2.0** since 2026-11-19 (paired; 1.0 paused; stock launcher disabled; its 1.0 IP Address cleared) |
-| Front Office | Amazon Fire TV | 192.168.0.151 | 1.0 |
+| Front Office | Amazon Fire TV (AFTKA, Fire OS, API 28) | 192.168.0.151 | **2.0** since 2026-11-19 (paired; 1.0 paused; its 1.0 IP Address cleared) |
 | Green Room | Fire TV Stick 4K (Fire OS 6, API 25) | 192.168.0.182 | 1.0, move last |
 | Room 101, Event Screen | not set up | | Screens exist on the dashboard |
 
