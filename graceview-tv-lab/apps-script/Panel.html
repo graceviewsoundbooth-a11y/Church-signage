@@ -1070,7 +1070,7 @@ var COMMON_TZ=['America/New_York','America/Chicago','America/Denver','America/Ph
   'America/Puerto_Rico','America/Toronto','America/Vancouver','Europe/London','Australia/Sydney'];
 function chLoad(){var c=S.churchSettings||{};return {name:c.name||'',website:c.website||'',timeZone:c.timeZone||'America/Chicago',place:c.place||'',
   lat:c.lat==null?'':c.lat,lon:c.lon==null?'':c.lon,unit:c.unit||'F',messageLine:c.messageLineSet||'',noEvents:c.noEventsSet||'',dashboardAddress:c.dashboardAddress||'',
-  wifiName:c.wifiName||'',wifiPass:c.wifiPass||''};}
+  wifiName:c.wifiName||'',wifiPass:c.wifiPass||'',liveYouTube:c.liveYouTube||'',liveLocal:c.liveLocal||'',livePlays:c.livePlays||'YouTube'};}
 function chSite(){return String(chForm.website||'').trim().replace(/^https?:\/\//i,'').replace(/\/+$/,'');}
 function chMsgDefault(){var s=chSite();return s?'Watch '+s+' and your email for updates.':'';}
 function chEvDefault(){var s=chSite();return s?'See all events at '+s:'Nothing on the calendar this week.';}
@@ -1122,6 +1122,13 @@ function vChurch(){
     '<label class="f">Temperature<select data-cf="unit"><option value="F"'+(f.unit==='F'?' selected':'')+'>°F</option><option value="C"'+(f.unit==='C'?' selected':'')+'>°C</option></select></label>'+
     '<label class="f">Time zone<select data-cf="timeZone">'+chZones().map(function(z){return '<option'+(z===f.timeZone?' selected':'')+'>'+esc(z)+'</option>';}).join('')+'</select></label></div>'+
     '<p class="muted small" style="margin:6px 0 0">Schedules, clocks and calendar times all use this time zone. Picking a weather location sets it for you.</p></section>';
+
+  h+='<section class="panel"><h3>Live feed</h3>'+
+    '<p class="muted small" style="margin:0 0 8px">What TVs play during a <b>Live</b> schedule row, and what the <b>Watch Live</b> tile opens. The tile shows on its own while the YouTube channel is live.</p>'+
+    '<div class="fgrid"><label class="f">YouTube live link<input type="text" data-cf="liveYouTube" value="'+esc(f.liveYouTube)+'" placeholder="https://www.youtube.com/@yourchurch/live" spellcheck="false"></label>'+
+    '<label class="f">Local stream (optional)<input type="text" data-cf="liveLocal" value="'+esc(f.liveLocal)+'" placeholder="rtsp://192.168.0.50:554/live" spellcheck="false"></label>'+
+    '<label class="f">Live mode plays<select data-cf="livePlays"><option'+(f.livePlays!=='Local stream'?' selected':'')+'>YouTube</option><option'+(f.livePlays==='Local stream'?' selected':'')+'>Local stream</option></select></label></div>'+
+    '<p class="muted small" style="margin:6px 0 0">YouTube opens in the YouTube app and runs 20 to 30 seconds behind. A local stream (RTSP or SRT from an encoder or vMix on the church network) plays inside the app with less delay; when it isn’t answering, Watch Live falls back to YouTube. Browser screens and previews can’t play either.</p></section>';
 
   h+='<section class="panel"><h3>Wording on the screens</h3><div class="fgrid">'+
     '<label class="f">Line under an emergency message<input type="text" data-cf="messageLine" value="'+esc(f.messageLine)+'" placeholder="'+esc(chMsgDefault()||'No line')+'"></label>'+

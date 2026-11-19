@@ -1169,7 +1169,8 @@ function setSetting_(key, value) {
 /* ---------- Church settings ----------
  * Set on the Church page (Owner and Admin). Stored in the Settings tab:
  *   Church Name, Website, Time Zone, Weather Place, Weather Lat, Weather Lon, Temperature Unit,
- *   Message Line (under an Override Now message), No Events Text (This Week with nothing on it).
+ *   Message Line (under an Override Now message), No Events Text (This Week with nothing on it),
+ *   Live YouTube, Live Local Stream, Live Plays (see Live feed below).
  * Blank lines fall back to wording built from the website, so a church only has to fill in the website.
  */
 const DEFAULT_TZ = 'America/Chicago';
@@ -1210,7 +1211,31 @@ function church_() {
     logo: logoImg_(st['Church Logo']),
     wifiName: String(st['Wi-Fi Name'] || '').trim(),
     wifiPass: String(st['Wi-Fi Password'] || ''),
+    liveYouTube: String(st['Live YouTube'] || '').trim(),
+    liveLocal: String(st['Live Local Stream'] || '').trim(),
+    livePlays: livePlays_(st),
   };
+}
+
+/* ---------- Live feed ----------
+ * Two addresses on the Church page: the YouTube channel's /live link and, optionally, a local stream
+ * (RTSP or SRT from an encoder on the church network). "Live mode plays" picks which one a scheduled
+ * Live row plays. TVs get them as the production Sheet's Live Feeds rows (Feed, Type, Address, Active, Notes):
+ * the YouTube row also drives the automatic Watch Live tile, Active or not.
+ */
+const YOUTUBE_RE = /^https:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\/\S+$/i;
+const STREAM_RE = /^(rtsps?|srt|rtmp|https?):\/\/\S+$/i;
+function livePlays_(st) {
+  return String(st['Live Plays'] || '') === 'Local stream' && String(st['Live Local Stream'] || '').trim() ? 'Local stream' : 'YouTube';
+}
+function liveFeeds_() {
+  const st = settings_();
+  const yt = String(st['Live YouTube'] || '').trim(), local = String(st['Live Local Stream'] || '').trim();
+  const plays = livePlays_(st);
+  const rows = [];
+  if (yt) rows.push(['YouTube', 'YouTube', yt, plays === 'YouTube' ? 'TRUE' : 'FALSE', '']);
+  if (local) rows.push(['Local stream', 'Local stream', local, plays === 'Local stream' ? 'TRUE' : 'FALSE', '']);
+  return rows;
 }
 /** What screens and TVs need. */
 function churchForScreens_() {
@@ -1246,6 +1271,10 @@ function saveChurchSettings(o, token) {
   const lat = blank(o.lat) ? '' : num_(o.lat), lon = blank(o.lon) ? '' : num_(o.lon);
   if (lat === null || lon === null || (lat === '') !== (lon === '') || (lat !== '' && (Math.abs(lat) > 90 || Math.abs(lon) > 180)))
     throw new Error('Pick the weather location from the search results.');
+  const yt = String(o.liveYouTube || '').trim(), local = String(o.liveLocal || '').trim();
+  if (yt && !YOUTUBE_RE.test(yt)) throw new Error('The YouTube address should be the channel\'s live link, like https://www.youtube.com/@yourchurch/live');
+  if (local && !STREAM_RE.test(local)) throw new Error('The local stream address should start with rtsp://, srt:// or https://');
+  if (o.livePlays === 'Local stream' && !local) throw new Error('Add the local stream address, or set Live mode to play YouTube.');
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
     setSetting_('Church Name', name);
@@ -1262,6 +1291,9 @@ function saveChurchSettings(o, token) {
     setSetting_('Dashboard Address', addr);
     setSetting_('Wi-Fi Name', String(o.wifiName || '').trim());
     setSetting_('Wi-Fi Password', String(o.wifiName || '').trim() ? String(o.wifiPass || '') : '');
+    setSetting_('Live YouTube', yt);
+    setSetting_('Live Local Stream', local);
+    setSetting_('Live Plays', o.livePlays === 'Local stream' ? 'Local stream' : 'YouTube');
     tzCache_ = null;
   } finally { lock.releaseLock(); }
   log_(me, 'Church settings', name);
@@ -1862,7 +1894,7 @@ function toProductionBatch_(d, t) {
   // Each theme's slides folder doubles as a production "folder" of the same name.
   const folders = d.themes.map(function (th) { return [th.Theme, th['Slides Folder'] || '']; });
   // Green Room: the tab's rows as-is (settings by label, then the Mic Label table), like the production tab.
-  const ranges = [override, special, weekly, devices, themes, folders, [], d.greenRoom || []];
+  const ranges = [override, special, weekly, devices, themes, folders, liveFeeds_(), d.greenRoom || []];
   return { valueRanges: ranges.map(function (values) { return { values: values.map(function (r) { return r.map(String); }) }; }) };
 }
 

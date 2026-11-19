@@ -116,6 +116,7 @@ On **Settings → Church** (Owner and Admin), the church-wide settings, stored o
 - **Guest Wi-Fi:** name and password for the Wi-Fi QR code on any theme with no Wi-Fi of its own. A theme's own logo or Wi-Fi always wins; the theme editor shows the church default in gray.
 - **Weather location:** search a town or ZIP code (Open-Meteo's free place search, no key) and pick it. This also sets the time zone. You can rename the label shown next to the temperature. **No weather** leaves the weather spot empty. Choose **°F or °C**.
 - **Time zone:** schedules, clocks and calendar times all use it.
+- **Live feed:** the YouTube channel's live link (like `https://www.youtube.com/@yourchurch/live`), an optional **local stream** (RTSP or SRT from an encoder or vMix on the church network), and which one **Live mode plays**. YouTube opens in the YouTube app, 20 to 30 seconds behind; a local stream plays inside the app with less delay. The **Watch Live** tile shows on its own while the YouTube channel is live, and plays the local stream when it's answering, otherwise YouTube. Browser screens and previews can't play either.
 - **Wording on the screens:** the line under an Override Now message and the This Week text when the calendar is empty. Leave them blank to use wording built from the website ("Watch graceview.org and your email for updates.", "See all events at graceview.org"). A preview shows the emergency message.
 
 Paired TVs pick up changes on their next check-in. The weather refreshes right away when its location or unit changes.
