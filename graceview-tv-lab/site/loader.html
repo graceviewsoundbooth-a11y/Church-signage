@@ -19,6 +19,9 @@
 </div>
 <script>
 (function () {
+  // Run once, even if the website shows this block twice.
+  if (window.__csLoader) { var dup = document.getElementById('cs-dash'); if (dup && dup !== window.__csLoader) dup.style.display = 'none'; return; }
+  window.__csLoader = document.getElementById('cs-dash');
   var EXEC = 'https://script.google.com/macros/s/AKfycbz1e2aevuTTBZJMOdzksVbK2BqcyRBR2ffS8R-IDmJ03vUMJ50jZRt7X02YV9AmoriWtQ/exec';
   var PAGE_KEY = 'cs-dash-page';
   var box = document.getElementById('cs-dash');
@@ -42,7 +45,16 @@
   };
   window.__csFirst.p.catch(function () { /* the page reports it */ });
 
+  var shown = false;
   function show(page) {
+    if (shown) return;
+    // While the browser is still reading the website's page, writing would land in the middle of it
+    // (header, footer and the site's styles around the dashboard). Wait until it has finished.
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { show(page); });
+      return;
+    }
+    shown = true;
     // The dashboard is a whole page: it replaces this one (the website's header and footer go away).
     document.open();
     document.write(page.html);
