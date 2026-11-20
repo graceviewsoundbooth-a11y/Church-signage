@@ -114,11 +114,14 @@ class Scheduler(
 ) {
     private val zone get() = Config.ZONE // the church's zone, which the dashboard can change
 
-    fun matches(target: String): Boolean = when (target.trim().uppercase(Locale.US)) {
-        "ALL" -> true
-        "ALL SIGNAGE" -> device.isSignage
-        "CLASSROOMS" -> device.isClassroom
-        else -> target.trim().equals(device.name, ignoreCase = true)
+    /** A target may list several, separated by commas ("Lobby, Coffee Spot"), as the dashboard saves them. */
+    fun matches(target: String): Boolean = target.split(',').any { one ->
+        when (one.trim().uppercase(Locale.US)) {
+            "ALL" -> true
+            "ALL SIGNAGE" -> device.isSignage
+            "CLASSROOMS" -> device.isClassroom
+            else -> one.trim().isNotEmpty() && one.trim().equals(device.name, ignoreCase = true)
+        }
     }
 
     /** Start inclusive, end exclusive. An end at or before the start runs past midnight. */

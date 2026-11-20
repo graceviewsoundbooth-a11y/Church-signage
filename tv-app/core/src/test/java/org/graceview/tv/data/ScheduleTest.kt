@@ -127,6 +127,12 @@ class ScheduleTest {
         // Decided 2026-11-05: CLASSROOMS matches Classroom only, not the Green Room.
         assertFalse(Scheduler(d, greenRoom).matches("CLASSROOMS"))
         assertFalse(Scheduler(d, greenRoom).matches("ALL SIGNAGE"))
+        // The dashboard saves several TVs as one comma-separated cell.
+        assertTrue(Scheduler(d, lobby).matches("Lobby, Coffee Spot"))
+        assertTrue(Scheduler(d, lobby).matches("Coffee Spot,Lobby"))
+        assertFalse(Scheduler(d, lobby).matches("Coffee Spot, Front Office"))
+        assertFalse(Scheduler(d, lobby).matches(""))
+        assertTrue(Scheduler(d, room101).matches("Lobby, CLASSROOMS"))
     }
 
     @Test
