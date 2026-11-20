@@ -39,7 +39,8 @@ class ScheduleTest {
         weekly: List<WeeklyRow> = lobbyWeek,
         special: List<SpecialRow> = emptyList(),
         override: OverrideNow? = null,
-    ) = SheetData(listOf(lobby, room101, greenRoom), emptyList(), emptyList(), override, special, weekly)
+        folders: List<Folder> = emptyList(),
+    ) = SheetData(listOf(lobby, room101, greenRoom), emptyList(), folders, override, special, weekly)
 
     // 2026-11-15 is a Sunday, 2026-11-19 a Thursday, 2026-11-20 a Friday, 2026-11-21 a Saturday.
     private fun at(date: String, time: String) = LocalDate.parse(date).atTime(t(time)).atZone(zone)
@@ -96,6 +97,20 @@ class ScheduleTest {
         assertEquals(Mode.LiveOption, mode(room101, "2026-11-15", "10:45 AM", d))
         // Unchecked Active: the normal schedule.
         assertEquals(Mode.Live, mode(lobby, "2026-11-15", "10:45 AM", data(override = ov.copy(active = false))))
+    }
+
+    @Test
+    fun overrideThemeBringsItsOwnSlidesFolder() {
+        val folders = listOf(Folder("Church", "https://drive.google.com/drive/folders/c"), Folder("School", "https://drive.google.com/drive/folders/s"), Folder("Empty", ""))
+        val ov = OverrideNow(true, "ALL SIGNAGE, Lobby", Mode.Signage, "School", "")
+        val s = Scheduler(data(override = ov, folders = folders), lobby).stateAt(at("2026-11-20", "10:50 AM"))
+        assertEquals("School", s.theme)
+        assertEquals("School", s.folder)
+        // No theme, or a theme without a folder: the TV's own default folder.
+        val noTheme = Scheduler(data(override = ov.copy(theme = ""), folders = folders), lobby).stateAt(at("2026-11-20", "10:50 AM"))
+        assertEquals("Church", noTheme.folder)
+        val empty = Scheduler(data(override = ov.copy(theme = "Empty"), folders = folders), lobby).stateAt(at("2026-11-20", "10:50 AM"))
+        assertEquals("Church", empty.folder)
     }
 
     @Test

@@ -135,7 +135,10 @@ class Scheduler(
     fun stateAt(now: ZonedDateTime): ScheduleState {
         val o = data.override
         if (o != null && o.active && matches(o.devices)) {
-            return ScheduleState(o.mode, o.theme.ifBlank { device.defaultTheme }, device.defaultFolder, o.message, "", null, "Override Now")
+            // The override has no Folder of its own. When its theme has a folder of the same name
+            // (as every 2.0 theme does), show that theme's slides, like Weekly and Special rows.
+            val folder = o.theme.takeIf { it.isNotBlank() && data.folder(it)?.link?.isNotBlank() == true }?.trim() ?: device.defaultFolder
+            return ScheduleState(o.mode, o.theme.ifBlank { device.defaultTheme }, folder, o.message, "", null, "Override Now")
         }
 
         val today = now.toLocalDate()
