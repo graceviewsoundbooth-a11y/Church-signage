@@ -298,6 +298,16 @@ class SignageViewModel(app: Application) : AndroidViewModel(app) {
     /** Woken by the remote while Off, or Home pressed from another app. */
     fun cameBackToApp() {
         offSince = System.currentTimeMillis()
+        if (AppState.awayReturnPending) {
+            // Brought back after sitting idle in another app: show the schedule, not our home screen.
+            AppState.awayReturnPending = false
+            while (back()) {}
+            showHome.value = false
+            exitBanner.value = false
+            manualSignage.value = false
+            if (applied.value?.mode == Mode.Off) _events.tryEmit(UiEvent.Sleep)
+            return
+        }
         if (applied.value?.mode == Mode.Off && device.value?.hasScheduledPower == true && !manualSignage.value) openHome()
     }
 

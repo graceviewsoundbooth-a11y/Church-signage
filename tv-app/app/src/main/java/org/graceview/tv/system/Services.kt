@@ -27,6 +27,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import org.graceview.tv.Config
 import org.graceview.tv.MainActivity
 import org.graceview.tv.R
 import org.graceview.tv.data.Mode
@@ -34,22 +35,27 @@ import org.graceview.tv.data.ScheduleState
 
 /**
  * Sends the remote's Home button to our home screen (CLAUDE.md, Launcher and navigation).
- * Also provides the lock-screen action used as the second way to sleep.
- * Enabled once per stick by the setup script. Not used on Fire TV.
+ * Also provides the lock-screen action used as the second way to sleep, and records every remote
+ * press, in any app, so a TV left idle in another app can return to the schedule (AwayCheck).
+ * Enabled once per stick by the setup script. On Fire TV it only records presses (Fire always
+ * sends Home to Amazon's launcher).
  */
 class HomeKeyService : AccessibilityService() {
     companion object {
         @Volatile private var instance: HomeKeyService? = null
         fun lockScreen(): Boolean =
             instance?.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN) ?: false
+        /** True when remote presses in other apps are being seen. */
+        val running: Boolean get() = instance != null
     }
 
-    override fun onServiceConnected() { instance = this }
+    override fun onServiceConnected() { instance = this; Log.i("HomeKeyService", "Connected") }
     override fun onDestroy() { instance = null; super.onDestroy() }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
     override fun onInterrupt() {}
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
+        AppState.lastInputAt = System.currentTimeMillis()
         if (event.keyCode != KeyEvent.KEYCODE_HOME || Platform.isFireTv(this)) return false
         if (event.action == KeyEvent.ACTION_UP) {
             // Resolves to our HOME alias, so it lands in the same task as a normal Home press.
@@ -76,8 +82,10 @@ class TransitionService : Service() {
         private const val CHANNEL = "transitions"
         private const val PROMPT_SECONDS = 60
 
-        fun start(ctx: Context) {
-            runCatching { ContextCompat.startForegroundService(ctx, Intent(ctx, TransitionService::class.java)) }
+        private const val EXTRA_AWAY = "away"
+
+        fun start(ctx: Context, away: Boolean = false) {
+            runCatching { ContextCompat.startForegroundService(ctx, Intent(ctx, TransitionService::class.java).putExtra(EXTRA_AWAY, away)) }
                 .onFailure { Log.w(TAG, "Couldn't start", it) }
         }
     }
@@ -89,7 +97,8 @@ class TransitionService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         goForeground()
-        handler.post { decide() }
+        val away = intent?.getBooleanExtra(EXTRA_AWAY, false) == true
+        handler.post { if (away) decideAway() else decide() }
         return START_NOT_STICKY
     }
 
@@ -117,8 +126,39 @@ class TransitionService : Service() {
                 AppState.appliedMode(this) == Mode.Off ||
                 AppState.launchedLiveExternally -> launch("wake")
             !Settings.canDrawOverlays(this) -> launch("no overlay permission")
-            else -> showPrompt(target)
+            else -> showPrompt(
+                message = { "Switching to ${target.mode.label} in $it seconds. Press OK to stay." },
+                onStay = { AppState.setSkippedKey(this, target.key) },
+                onGo = { launch(it) },
+            )
         }
+    }
+
+    /**
+     * The TV has sat in another app with no remote press and no sound for AWAY_IDLE_MS
+     * (AwayCheck): "Returning to signage in 60 seconds. Press OK to stay."
+     */
+    private fun decideAway() {
+        if (overlay != null) return // a prompt is already up
+        if (AppState.activityResumed) return finish()
+        val off = AppState.appliedMode(this) == Mode.Off
+        val what = if (off) "Turning the TV off" else "Returning to signage"
+        if (!Settings.canDrawOverlays(this)) return returnFromAway("no overlay permission")
+        Log.i(TAG, "Idle in another app: prompting")
+        showPrompt(
+            message = { "$what in $it seconds. Press OK to stay." },
+            onStay = {
+                // Another 10 minutes before asking again.
+                AppState.lastInputAt = System.currentTimeMillis()
+                AwayCheck.schedule(this, System.currentTimeMillis() + Config.AWAY_IDLE_MS)
+            },
+            onGo = { returnFromAway(it) },
+        )
+    }
+
+    private fun returnFromAway(reason: String) {
+        AppState.awayReturnPending = true
+        launch("idle in another app: $reason")
     }
 
     private fun launch(reason: String) {
@@ -127,7 +167,7 @@ class TransitionService : Service() {
         finish()
     }
 
-    private fun showPrompt(target: ScheduleState) {
+    private fun showPrompt(message: (Int) -> String, onStay: () -> Unit, onGo: (String) -> Unit) {
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
         val text = TextView(this).apply {
             setTextColor(Color.WHITE)
@@ -140,10 +180,10 @@ class TransitionService : Service() {
                 if (event.action != KeyEvent.ACTION_UP) return true
                 when (event.keyCode) {
                     KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                        AppState.setSkippedKey(this@TransitionService, target.key)
+                        onStay()
                         removeOverlay(); finish()
                     }
-                    KeyEvent.KEYCODE_BACK -> launch("switch now")
+                    KeyEvent.KEYCODE_BACK -> onGo("switch now")
                 }
                 return true
             }
@@ -161,7 +201,7 @@ class TransitionService : Service() {
             PixelFormat.TRANSLUCENT,
         ).apply { gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL; y = 80 }
 
-        runCatching { wm.addView(root, lp) }.onFailure { Log.w(TAG, "Overlay failed", it); return launch("overlay failed") }
+        runCatching { wm.addView(root, lp) }.onFailure { Log.w(TAG, "Overlay failed", it); return onGo("overlay failed") }
         overlay = root
         root.requestFocus()
 
@@ -169,8 +209,8 @@ class TransitionService : Service() {
         val tick = object : Runnable {
             override fun run() {
                 if (overlay == null) return
-                if (left <= 0) return launch("prompt timed out")
-                text.text = "Switching to ${target.mode.label} in $left seconds. Press OK to stay."
+                if (left <= 0) return onGo("prompt timed out")
+                text.text = message(left)
                 left--
                 handler.postDelayed(this, 1000)
             }

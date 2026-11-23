@@ -38,6 +38,12 @@ object Config {
     const val SLIDE_MAX_MS = 12_000L
 
     /**
+     * Signage TVs left in another app (Amazon's home screen, YouTube, ...) with no remote press
+     * and no sound for this long return to the schedule (1.0 decision 2026-11-17, ported 2026-11-23).
+     */
+    const val AWAY_IDLE_MS = 10 * 60_000L
+
+    /**
      * Themes Calendar cell with several calendars ("school; church"): when the first has fewer
      * than CALENDAR_MIN_EVENTS in the next 7 days, the others fill the list up to CALENDAR_FILL_TO.
      */

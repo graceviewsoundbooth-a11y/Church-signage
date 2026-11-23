@@ -25,6 +25,10 @@ object AppState {
     @Volatile var lastInputAt = 0L
     /** True after we sent the user to YouTube for a Live window, so the end of Live returns without asking. */
     @Volatile var launchedLiveExternally = false
+    /** When the app last left the screen (another app opened, Home pressed). 0 = not since start. */
+    @Volatile var leftAppAt = 0L
+    /** Set when the app is brought back because the TV sat idle in another app (AwayCheck). */
+    @Volatile var awayReturnPending = false
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("graceview", Context.MODE_PRIVATE)
 

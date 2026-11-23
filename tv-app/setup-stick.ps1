@@ -158,23 +158,27 @@ $out = Sh "dpm set-active-admin $admin"
 $admins = Sh 'dumpsys device_policy'
 Note 'Device admin (sleep for Off)' (($out -match 'Success') -or ($admins -match [regex]::Escape($admin))) ($out.Trim())
 
+# This app's accessibility service on; the other version's off (only one app may take Home).
+# It catches Home on Google TV, and on every TV records remote presses in other apps, so a
+# Signage TV left idle in another app returns to the schedule after 10 minutes.
+$svc = "$Pkg/$Ns.system.HomeKeyService"
+$otherSvc = "$Other/$Ns.system.HomeKeyService"
+$current = (Sh 'settings get secure enabled_accessibility_services').Trim()
+$list = @()
+if ($current -and $current -ne 'null') { $list = @($current -split ':' | Where-Object { $_ -and $_ -ne $otherSvc -and $_ -ne $svc }) }
+$list += $svc
+$null = Sh ("settings put secure enabled_accessibility_services {0}" -f ($list -join ':'))
+$null = Sh 'settings put secure accessibility_enabled 1'
+Start-Sleep 2
+$now = (Sh 'settings get secure enabled_accessibility_services').Trim()
+$what = 'Home button and idle tracking'; if ($fire) { $what = 'Idle tracking (remote presses)' }
+Note $what (($now -split ':') -contains $svc) 'accessibility service enabled'
+if ($current -split ':' -contains $otherSvc) {
+    Note 'Other version''s accessibility service' (-not (($now -split ':') -contains $otherSvc)) "turned off for $Other"
+}
+
 if (-not $fire) {
-    # This app's Home-button service on; the other version's off (only one app may take Home).
-    $svc = "$Pkg/$Ns.system.HomeKeyService"
-    $otherSvc = "$Other/$Ns.system.HomeKeyService"
-    $current = (Sh 'settings get secure enabled_accessibility_services').Trim()
-    $list = @()
-    if ($current -and $current -ne 'null') { $list = @($current -split ':' | Where-Object { $_ -and $_ -ne $otherSvc -and $_ -ne $svc }) }
-    $list += $svc
-    $null = Sh ("settings put secure enabled_accessibility_services {0}" -f ($list -join ':'))
-    $null = Sh 'settings put secure accessibility_enabled 1'
-    Start-Sleep 2
-    $now = (Sh 'settings get secure enabled_accessibility_services').Trim()
-    Note 'Home button service' (($now -split ':') -contains $svc) 'accessibility service enabled'
-    if ($current -split ':' -contains $otherSvc) {
-        Note 'Other version''s Home button' (-not (($now -split ':') -contains $otherSvc)) "turned off for $Other"
-    }
-    # And the TV's default home app, for the cases the Home-button service doesn't cover (after a restart).
+    # The TV's default home app, for the cases the Home-button service doesn't cover (after a restart).
     $out = Sh "cmd package set-home-activity $Pkg/$Ns.HomeAlias"
     Note 'Default home app' ($out -notmatch 'rror|nknown') ($(if ($out.Trim()) { $out.Trim() } else { "set to $Pkg" }))
 
@@ -186,8 +190,6 @@ if (-not $fire) {
             }
         }
     }
-} else {
-    Note 'Home button service' $true 'skipped on Fire TV (Fire always sends Home to Amazon)'
 }
 
 # --- HDMI-CEC: let the stick turn the TV off at night and on in the morning -----

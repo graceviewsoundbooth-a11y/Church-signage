@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import org.graceview.tv.data.Mode
 import org.graceview.tv.system.AppState
+import org.graceview.tv.system.AwayCheck
 import org.graceview.tv.system.Clock
 import org.graceview.tv.system.Power
 import org.graceview.tv.system.TransitionAlarm
@@ -163,6 +164,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         AppState.activityResumed = true
+        AwayCheck.cancel(this)
         vm.cameBackToApp()
     }
 
@@ -172,6 +174,9 @@ class MainActivity : ComponentActivity() {
         okHolding = false
         AppState.activityResumed = false
         pausedAt = System.currentTimeMillis()
+        // Another app (or Amazon's home screen) took over: return to the schedule if it sits idle.
+        AppState.leftAppAt = pausedAt
+        AwayCheck.schedule(this, pausedAt + Config.AWAY_IDLE_MS)
         super.onPause()
     }
 

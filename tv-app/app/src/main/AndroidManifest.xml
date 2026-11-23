@@ -77,6 +77,7 @@
         </activity-alias>
 
         <receiver android:name=".system.TransitionReceiver" android:exported="false" />
+        <receiver android:name=".system.AwayReceiver" android:exported="false" />
 
         <!-- Planning Center token from setup-stick.ps1. DUMP is held by the adb shell, not by apps. -->
         <receiver
